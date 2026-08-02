@@ -8,6 +8,7 @@ struct WatchSpeaksComplication: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: Provider()) { entry in
             ComplicationView(entry: entry)
+                .containerBackground(.clear, for: .widget)
         }
         .configurationDisplayName("Watch Speaks")
         .description("Tap to open Watch Speaks")
@@ -49,17 +50,20 @@ struct ComplicationView: View {
         case .accessoryCircular:
             ZStack {
                 AccessoryWidgetBackground()
-                Image(systemName: "speaker.wave.3.fill")
+                Image(systemName: "speaker.wave.2.fill")
                     .font(.title3)
+                    .widgetAccentable()
             }
         case .accessoryCorner:
-            Image(systemName: "speaker.wave.3.fill")
+            Image(systemName: "speaker.wave.2.fill")
+                .font(.title2)
+                .widgetAccentable()
                 .widgetLabel("Watch Speaks")
         case .accessoryInline:
-            Label("Watch Speaks", systemImage: "speaker.wave.3.fill")
+            Label("Watch Speaks", systemImage: "speaker.wave.2.fill")
         case .accessoryRectangular:
             HStack {
-                Image(systemName: "speaker.wave.3.fill")
+                Image(systemName: "speaker.wave.2.fill")
                     .font(.title3)
                 VStack(alignment: .leading) {
                     Text("Watch Speaks")
@@ -70,7 +74,7 @@ struct ComplicationView: View {
                 }
             }
         @unknown default:
-            Image(systemName: "speaker.wave.3.fill")
+            Image(systemName: "speaker.wave.2.fill")
         }
     }
 }
