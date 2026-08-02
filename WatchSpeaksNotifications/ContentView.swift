@@ -40,16 +40,25 @@ struct ContentView: View {
             HStack(spacing: 16) {
                 Image(systemName: "applewatch.radiowaves.left.and.right")
                     .font(.system(size: 40))
-                    .foregroundStyle(sync.isWatchReachable ? .green : .orange)
+                    .foregroundStyle(sync.isWatchPaired ? .green : .orange)
                     .frame(width: 50)
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(sync.isWatchReachable ? "Watch Connected" : "Watch Not Reachable")
-                        .font(.title2.bold())
-
-                    Text(sync.announcementsEnabled ? "Announcements Active" : "Announcements Paused")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                    if sync.isWatchPaired {
+                        Text("Watch Paired")
+                            .font(.title2.bold())
+                        Text(sync.isWatchReachable
+                             ? "Watch app active"
+                             : "Watch app in background")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text("Watch Not Paired")
+                            .font(.title2.bold())
+                        Text("Pair an Apple Watch to get started")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
             .padding(.vertical, 8)
@@ -59,7 +68,11 @@ struct ContentView: View {
         } header: {
             Text("Status")
         } footer: {
-            Text("When enabled, selected notifications will be spoken aloud on your Apple Watch.")
+            if sync.isWatchPaired {
+                Text("Announcements are delivered instantly when the Watch app is active, or queued for delivery when it\u{2019}s in the background.")
+            } else {
+                Text("When enabled, selected notifications will be spoken aloud on your Apple Watch.")
+            }
         }
     }
 

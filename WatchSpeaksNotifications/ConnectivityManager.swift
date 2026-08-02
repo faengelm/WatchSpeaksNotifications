@@ -103,12 +103,32 @@ class ConnectivityManager: NSObject, ObservableObject, WCSessionDelegate {
 
     // MARK: - WCSessionDelegate (required)
 
+    private var activationContinuations: [CheckedContinuation<Void, Never>] = []
+
+    func waitForActivation() async {
+        if WCSession.default.activationState == .activated { return }
+        await withCheckedContinuation { continuation in
+            DispatchQueue.main.async {
+                if WCSession.default.activationState == .activated {
+                    continuation.resume()
+                } else {
+                    self.activationContinuations.append(continuation)
+                }
+            }
+        }
+    }
+
     func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState, error: (any Error)?) {
         DispatchQueue.main.async {
             self.isWatchPaired = session.isPaired
             self.isWatchReachable = session.isReachable
         }
         if activationState == .activated {
+            let pending = activationContinuations
+            activationContinuations.removeAll()
+            for continuation in pending {
+                continuation.resume()
+            }
             syncSettings()
         }
     }
@@ -127,13 +147,18 @@ class ConnectivityManager: NSObject, ObservableObject, WCSessionDelegate {
 
     // MARK: - Send Announcement to Watch
 
+    private var latestAnnouncementForContext: [String: Any]?
+
     func sendAnnouncement(text: String, source: String) {
         guard announcementsEnabled else { return }
         guard isSourceEnabled(source) else { return }
         guard WCSession.default.activationState == .activated else { return }
 
+        let messageId = UUID().uuidString
+
         let message: [String: Any] = [
             "type": "announcement",
+            "id": messageId,
             "text": text,
             "source": source,
             "timestamp": Date().timeIntervalSince1970,
@@ -156,13 +181,17 @@ class ConnectivityManager: NSObject, ObservableObject, WCSessionDelegate {
             self.saveLog()
         }
 
+        // Channel 1: Queue via transferUserInfo for guaranteed delivery
+        WCSession.default.transferUserInfo(message)
+
+        // Channel 2: Try sendMessage for immediate delivery when Watch app is active
         if WCSession.default.isReachable {
-            WCSession.default.sendMessage(message, replyHandler: nil) { _ in
-                WCSession.default.transferUserInfo(message)
-            }
-        } else {
-            WCSession.default.transferUserInfo(message)
+            WCSession.default.sendMessage(message, replyHandler: nil, errorHandler: nil)
         }
+
+        // Channel 3: Embed in application context so Watch gets it on ANY wake-up
+        latestAnnouncementForContext = message
+        syncSettings()
     }
 
     func sendTestAnnouncement() {
@@ -188,13 +217,16 @@ class ConnectivityManager: NSObject, ObservableObject, WCSessionDelegate {
 
     private func syncSettings() {
         guard WCSession.default.activationState == .activated else { return }
-        let context: [String: Any] = [
+        var context: [String: Any] = [
             "source": "phone",
             "speechRate": speechRate,
             "speechPitch": speechPitch,
             "announcementsEnabled": announcementsEnabled,
             "prefixSourceName": prefixSourceName,
         ]
+        if let announcement = latestAnnouncementForContext {
+            context["latestAnnouncement"] = announcement
+        }
         try? WCSession.default.updateApplicationContext(context)
     }
 

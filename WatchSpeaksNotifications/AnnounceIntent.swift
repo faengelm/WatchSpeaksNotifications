@@ -1,4 +1,5 @@
 import AppIntents
+import WatchConnectivity
 
 struct AnnounceOnWatchIntent: AppIntent {
     static var title: LocalizedStringResource = "Announce on Watch"
@@ -17,8 +18,13 @@ struct AnnounceOnWatchIntent: AppIntent {
     }
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
+        let manager = ConnectivityManager.shared
+
+        // Wait for WCSession to activate (critical when launched from Shortcuts)
+        await manager.waitForActivation()
+
         await MainActor.run {
-            ConnectivityManager.shared.sendAnnouncement(text: text, source: sourceApp)
+            manager.sendAnnouncement(text: text, source: sourceApp)
         }
         return .result(dialog: "Announcement sent to Apple Watch")
     }
@@ -29,8 +35,8 @@ struct AnnounceShortcuts: AppShortcutsProvider {
         AppShortcut(
             intent: AnnounceOnWatchIntent(),
             phrases: [
-                "Announce \(\.$text) on Watch with \(.applicationName)",
-                "Speak \(\.$text) on Watch with \(.applicationName)",
+                "Announce on Watch with \(.applicationName)",
+                "Speak notification with \(.applicationName)",
             ],
             shortTitle: "Announce on Watch",
             systemImageName: "speaker.wave.3.fill"

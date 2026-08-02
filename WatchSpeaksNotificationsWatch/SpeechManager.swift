@@ -7,17 +7,29 @@ class SpeechManager: NSObject, ObservableObject {
 
     private let synthesizer = AVSpeechSynthesizer()
     private var pendingAnnouncements: [String] = []
-    private var extendedSession: WKExtendedRuntimeSession?
 
     @Published var isSpeaking = false
     @Published var lastSpokenText: String?
+    @Published var lastError: String?
 
     var speechRate: Float = 0.5
     var speechPitch: Float = 1.0
+    var onComplete: (() -> Void)?
 
     override init() {
         super.init()
         synthesizer.delegate = self
+        activateAudioSession()
+    }
+
+    func activateAudioSession() {
+        do {
+            let session = AVAudioSession.sharedInstance()
+            try session.setCategory(.playback, mode: .spokenAudio)
+            try session.setActive(true)
+        } catch {
+            print("[Speech] Audio pre-activation: \(error)")
+        }
     }
 
     func speak(_ text: String, source: String? = nil, prefixSource: Bool = true) {
@@ -37,79 +49,72 @@ class SpeechManager: NSObject, ObservableObject {
     }
 
     private func performSpeak(_ text: String) {
-        startExtendedSession()
-
         do {
             let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playback, mode: .default, options: [.duckOthers])
+            try session.setCategory(.playback, mode: .spokenAudio)
             try session.setActive(true)
         } catch {
+            DispatchQueue.main.async {
+                self.lastError = "Audio: \(error.localizedDescription)"
+            }
             print("[Speech] Audio session error: \(error)")
         }
 
         let utterance = AVSpeechUtterance(string: text)
         utterance.rate = speechRate
         utterance.pitchMultiplier = speechPitch
-        utterance.voice = AVSpeechSynthesisVoice(
-            language: Locale.current.language.languageCode?.identifier ?? "en"
-        )
-        utterance.preUtteranceDelay = 0.3
+        utterance.volume = 1.0
+        utterance.preUtteranceDelay = 0.1
+        utterance.postUtteranceDelay = 0.2
 
-        isSpeaking = true
-        lastSpokenText = text
-        synthesizer.speak(utterance)
+        if let voice = AVSpeechSynthesisVoice(language: "en-US") {
+            utterance.voice = voice
+        }
+
+        DispatchQueue.main.async {
+            self.isSpeaking = true
+            self.lastSpokenText = text
+            self.lastError = nil
+            self.synthesizer.speak(utterance)
+        }
     }
 
-    // MARK: - Extended Runtime Session
-
-    private func startExtendedSession() {
-        guard extendedSession == nil || extendedSession?.state == .invalid else { return }
-        let session = WKExtendedRuntimeSession()
-        session.delegate = self
-        session.start()
-        extendedSession = session
-    }
-
-    private func endExtendedSession() {
-        extendedSession?.invalidate()
-        extendedSession = nil
+    private func finishSpeaking() {
+        DispatchQueue.main.async {
+            self.isSpeaking = false
+            try? AVAudioSession.sharedInstance().setActive(
+                false, options: .notifyOthersOnDeactivation
+            )
+            self.onComplete?()
+            self.onComplete = nil
+        }
     }
 }
 
 // MARK: - AVSpeechSynthesizerDelegate
 
 extension SpeechManager: AVSpeechSynthesizerDelegate {
+    func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didStart utterance: AVSpeechUtterance) {
+        DispatchQueue.main.async {
+            self.isSpeaking = true
+        }
+    }
+
     func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
-        if let next = pendingAnnouncements.first {
-            pendingAnnouncements.removeFirst()
-            performSpeak(next)
-        } else {
-            isSpeaking = false
-            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
-            endExtendedSession()
+        DispatchQueue.main.async {
+            if let next = self.pendingAnnouncements.first {
+                self.pendingAnnouncements.removeFirst()
+                self.performSpeak(next)
+            } else {
+                self.finishSpeaking()
+            }
         }
     }
 
     func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
-        isSpeaking = false
-        pendingAnnouncements.removeAll()
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
-        endExtendedSession()
-    }
-}
-
-// MARK: - WKExtendedRuntimeSessionDelegate
-
-extension SpeechManager: WKExtendedRuntimeSessionDelegate {
-    func extendedRuntimeSessionDidStart(_ extendedRuntimeSession: WKExtendedRuntimeSession) {}
-
-    func extendedRuntimeSessionWillExpire(_ extendedRuntimeSession: WKExtendedRuntimeSession) {}
-
-    func extendedRuntimeSession(
-        _ extendedRuntimeSession: WKExtendedRuntimeSession,
-        didInvalidateWith reason: WKExtendedRuntimeSessionInvalidationReason,
-        error: (any Error)?
-    ) {
-        self.extendedSession = nil
+        DispatchQueue.main.async {
+            self.pendingAnnouncements.removeAll()
+            self.finishSpeaking()
+        }
     }
 }
