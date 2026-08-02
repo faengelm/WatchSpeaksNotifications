@@ -7,6 +7,9 @@ class SpeechManager: NSObject, ObservableObject {
 
     private let synthesizer = AVSpeechSynthesizer()
     private var pendingAnnouncements: [String] = []
+    private var retryText: String?
+    private var retryCount = 0
+    private static let maxRetries = 2
 
     @Published var isSpeaking = false
     @Published var lastSpokenText: String?
@@ -25,7 +28,8 @@ class SpeechManager: NSObject, ObservableObject {
     func activateAudioSession() {
         do {
             let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playback, mode: .spokenAudio)
+            try session.setCategory(.playback, mode: .spokenAudio,
+                                    options: [.duckOthers])
             try session.setActive(true)
         } catch {
             print("[Speech] Audio pre-activation: \(error)")
@@ -45,13 +49,16 @@ class SpeechManager: NSObject, ObservableObject {
             return
         }
 
+        retryCount = 0
         performSpeak(fullText)
     }
 
     private func performSpeak(_ text: String) {
+        // Activate audio session synchronously before speaking
         do {
             let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playback, mode: .spokenAudio)
+            try session.setCategory(.playback, mode: .spokenAudio,
+                                    options: [.duckOthers])
             try session.setActive(true)
         } catch {
             DispatchQueue.main.async {
@@ -64,30 +71,32 @@ class SpeechManager: NSObject, ObservableObject {
         utterance.rate = speechRate
         utterance.pitchMultiplier = speechPitch
         utterance.volume = 1.0
-        utterance.preUtteranceDelay = 0.1
+        utterance.preUtteranceDelay = 0.3
         utterance.postUtteranceDelay = 0.2
 
         if let voice = AVSpeechSynthesisVoice(language: "en-US") {
             utterance.voice = voice
         }
 
-        DispatchQueue.main.async {
-            self.isSpeaking = true
-            self.lastSpokenText = text
-            self.lastError = nil
-            self.synthesizer.speak(utterance)
-        }
+        // Track for retry if speech produces no audio
+        retryText = text
+
+        // Speak immediately — no nested async dispatch
+        isSpeaking = true
+        lastSpokenText = text
+        lastError = nil
+        synthesizer.speak(utterance)
     }
 
     private func finishSpeaking() {
-        DispatchQueue.main.async {
-            self.isSpeaking = false
-            try? AVAudioSession.sharedInstance().setActive(
-                false, options: .notifyOthersOnDeactivation
-            )
-            self.onComplete?()
-            self.onComplete = nil
-        }
+        isSpeaking = false
+        retryText = nil
+        retryCount = 0
+        try? AVAudioSession.sharedInstance().setActive(
+            false, options: .notifyOthersOnDeactivation
+        )
+        onComplete?()
+        onComplete = nil
     }
 }
 
@@ -104,6 +113,7 @@ extension SpeechManager: AVSpeechSynthesizerDelegate {
         DispatchQueue.main.async {
             if let next = self.pendingAnnouncements.first {
                 self.pendingAnnouncements.removeFirst()
+                self.retryCount = 0
                 self.performSpeak(next)
             } else {
                 self.finishSpeaking()
@@ -113,8 +123,17 @@ extension SpeechManager: AVSpeechSynthesizerDelegate {
 
     func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
         DispatchQueue.main.async {
-            self.pendingAnnouncements.removeAll()
-            self.finishSpeaking()
+            // Retry on cancel — watchOS sometimes cancels when audio route isn't ready
+            if let text = self.retryText, self.retryCount < SpeechManager.maxRetries {
+                self.retryCount += 1
+                print("[Speech] Cancelled, retrying (\(self.retryCount)/\(SpeechManager.maxRetries))")
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    self.performSpeak(text)
+                }
+            } else {
+                self.pendingAnnouncements.removeAll()
+                self.finishSpeaking()
+            }
         }
     }
 }

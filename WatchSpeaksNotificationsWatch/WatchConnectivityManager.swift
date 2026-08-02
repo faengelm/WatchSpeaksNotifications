@@ -1,6 +1,7 @@
 import Foundation
 import WatchConnectivity
 import WatchKit
+import UserNotifications
 
 class WatchConnectivityManager: NSObject, ObservableObject, WCSessionDelegate {
     static let shared = WatchConnectivityManager()
@@ -8,19 +9,45 @@ class WatchConnectivityManager: NSObject, ObservableObject, WCSessionDelegate {
     @Published var announcementsEnabled = true
     @Published var prefixSourceName = true
     @Published var lastBackgroundWake: Date?
+    @Published var notificationsAllowed: Bool?
 
     private var hasStarted = false
     private var processedIds = Set<String>()
     private var pendingBackgroundTasks: [WKRefreshBackgroundTask] = []
     private var extendedSession: WKExtendedRuntimeSession?
 
+    // Pending speech for when app returns to foreground
+    private(set) var pendingSpeech: (text: String, source: String?, prefixSource: Bool)?
+
     func start() {
         guard !hasStarted else { return }
         hasStarted = true
+        requestNotificationPermission()
         guard WCSession.isSupported() else { return }
         let session = WCSession.default
         session.delegate = self
         session.activate()
+    }
+
+    // MARK: - Notification Permission
+
+    func requestNotificationPermission() {
+        UNUserNotificationCenter.current().requestAuthorization(
+            options: [.alert, .sound]
+        ) { granted, error in
+            DispatchQueue.main.async {
+                self.notificationsAllowed = granted
+            }
+            print("[Watch] Notification permission: \(granted), error: \(String(describing: error))")
+        }
+    }
+
+    func checkNotificationPermission() {
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            DispatchQueue.main.async {
+                self.notificationsAllowed = settings.authorizationStatus == .authorized
+            }
+        }
     }
 
     // MARK: - Extended Runtime Session (background only)
@@ -82,6 +109,19 @@ class WatchConnectivityManager: NSObject, ObservableObject, WCSessionDelegate {
         if !ctx.isEmpty, ctx["source"] as? String == "phone" {
             session(WCSession.default, didReceiveApplicationContext: ctx)
         }
+    }
+
+    // MARK: - Speak Pending on Foreground
+
+    /// Called when the app enters the foreground. If there is a pending
+    /// announcement that couldn't be spoken in the background, speak it now.
+    func speakPendingIfNeeded() {
+        guard let pending = pendingSpeech else { return }
+        pendingSpeech = nil
+        SpeechManager.shared.speak(
+            pending.text, source: pending.source, prefixSource: pending.prefixSource
+        )
+        WKInterfaceDevice.current().play(.click)
     }
 
     // MARK: - Send State to iPhone
@@ -157,17 +197,63 @@ class WatchConnectivityManager: NSObject, ObservableObject, WCSessionDelegate {
 
         guard !text.isEmpty else { return }
 
+        let isForeground = WKApplication.shared().applicationState == .active
+
         DispatchQueue.main.async {
-            SpeechManager.shared.speak(text, source: source, prefixSource: prefixSource)
-            WKInterfaceDevice.current().play(.notification)
+            if isForeground {
+                // Foreground: speak immediately with haptic
+                WKInterfaceDevice.current().play(.click)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                    SpeechManager.shared.speak(text, source: source, prefixSource: prefixSource)
+                }
+            } else {
+                // Background: chime first, then try to speak, then post notification
+                self.pendingSpeech = (text: text, source: source, prefixSource: prefixSource)
+                self.startBackgroundSession()
+
+                // Play system chime BEFORE activating speech audio session
+                WKInterfaceDevice.current().play(.notification)
+
+                // After chime, activate audio session and try to speak
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                    SpeechManager.shared.activateAudioSession()
+                    SpeechManager.shared.speak(text, source: source, prefixSource: prefixSource)
+                }
+
+                // Post notification so text is visible in notification center
+                self.postAnnouncementNotification(text: text, source: source)
+            }
 
             if !self.pendingBackgroundTasks.isEmpty || self.extendedSession != nil {
                 SpeechManager.shared.onComplete = { [weak self] in
+                    self?.pendingSpeech = nil  // Speech succeeded, clear pending
                     self?.completeAllPendingTasks()
                 }
             }
 
             self.sendState()
+        }
+    }
+
+    // MARK: - Local Notifications
+
+    private func postAnnouncementNotification(text: String, source: String?) {
+        let content = UNMutableNotificationContent()
+        content.title = source ?? "Watch Speaks"
+        content.body = text
+        content.interruptionLevel = .timeSensitive
+        content.categoryIdentifier = "ANNOUNCEMENT"
+
+        let request = UNNotificationRequest(
+            identifier: "announce-\(UUID().uuidString)",
+            content: content,
+            trigger: nil  // Deliver immediately
+        )
+
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error = error {
+                print("[Watch] Notification error: \(error)")
+            }
         }
     }
 }

@@ -2,9 +2,13 @@ import SwiftUI
 import WatchKit
 import WatchConnectivity
 import AVFoundation
+import UserNotifications
 
 class WatchAppDelegate: NSObject, WKApplicationDelegate {
     func applicationDidFinishLaunching() {
+        // Set ourselves as notification delegate so banners show even when app is active
+        UNUserNotificationCenter.current().delegate = NotificationDelegate.shared
+
         WatchConnectivityManager.shared.start()
         Self.scheduleNextRefresh()
     }
@@ -55,6 +59,31 @@ class WatchAppDelegate: NSObject, WKApplicationDelegate {
             userInfo: nil,
             scheduledCompletion: { _ in }
         )
+    }
+}
+
+// MARK: - Notification Delegate
+
+/// Handles notification presentation and tap actions on watchOS.
+class NotificationDelegate: NSObject, UNUserNotificationCenterDelegate {
+    static let shared = NotificationDelegate()
+
+    /// Show banner + sound even when the app is in the foreground or during a background task.
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        completionHandler([.banner, .sound])
+    }
+
+    /// User tapped the notification — app opens to foreground, scenePhase triggers speakPendingIfNeeded.
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
+        completionHandler()
     }
 }
 

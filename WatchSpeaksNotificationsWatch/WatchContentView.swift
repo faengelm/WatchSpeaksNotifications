@@ -33,6 +33,8 @@ struct WatchContentView: View {
             .onChange(of: scenePhase) { _, newPhase in
                 if newPhase == .active {
                     connectivity.processPendingData()
+                    connectivity.checkNotificationPermission()
+                    connectivity.speakPendingIfNeeded()
                 }
             }
         }
@@ -103,6 +105,16 @@ struct WatchContentView: View {
     private var settingsSection: some View {
         Section("Settings") {
             Toggle("Announcements", isOn: $connectivity.announcementsEnabled)
+
+            if let allowed = connectivity.notificationsAllowed {
+                HStack {
+                    Image(systemName: allowed ? "bell.badge.fill" : "bell.slash.fill")
+                        .foregroundStyle(allowed ? .green : .red)
+                        .font(.caption)
+                    Text(allowed ? "Notifications Allowed" : "Notifications Denied")
+                        .font(.caption2)
+                }
+            }
         }
     }
 }
