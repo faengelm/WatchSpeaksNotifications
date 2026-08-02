@@ -21,10 +21,10 @@ struct AboutView: View {
                             .font(.system(size: 60))
                             .foregroundStyle(.blue)
 
-                        Text("Watch Speaks Notifications")
+                        Text("Watch Speaks")
                             .font(.title2.bold())
 
-                        Text("Speak iPhone notifications\naloud on your Apple Watch")
+                        Text("Speak announcements aloud\non your Apple Watch")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                             .multilineTextAlignment(.center)

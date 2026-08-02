@@ -1,41 +1,30 @@
-# Watch Speaks Notifications
+# Watch Speaks
 
-An iOS + watchOS app that converts iPhone notifications into spoken announcements on your Apple Watch. When a notification arrives, the Watch speaks it aloud through its built-in speaker — similar to the workout milestone announcements during Apple Watch workouts.
+An iOS + watchOS app that speaks announcements aloud on your Apple Watch. Using the built-in **"Announce on Watch"** Shortcuts action, you can create automations that send any text to your Watch speaker — triggered by messages, calendar events, alarms, location changes, or any other Shortcuts trigger.
+
+## How It Works
+
+1. You create an **automation** in the iPhone Shortcuts app (e.g., "When I receive a message")
+2. The automation runs the **"Announce on Watch"** action with the text you want spoken
+3. The iPhone sends the text to the Apple Watch via **WatchConnectivity**
+4. The Watch speaks it aloud through its built-in speaker with a haptic tap
 
 ## Features
 
 ### iPhone App
-- **Notification Source Selection** — Choose which apps' notifications are announced (Messages, Mail, Calendar, Reminders, Phone, and more)
-- **Shortcuts Integration** — Provides an "Announce on Watch" action for the Shortcuts app, enabling custom automations
+- **Shortcuts Action** — "Announce on Watch" action available in the Shortcuts app for building automations
 - **Speech Customization** — Adjust speech rate and pitch to your preference
 - **Source Prefix** — Optionally say the source app name before each announcement (e.g., "Calendar: Meeting in 15 minutes")
-- **Announcement Log** — View recent announcements with timestamps and delivery status
-- **Test Mode** — Send a test announcement to verify your Watch speaker
+- **Test Button** — Send a test announcement to verify your Watch speaker
+- **Announcement Log** — View recent announcements with delivery status and timestamps
 
 ### Apple Watch App
-- **Text-to-Speech** — Converts incoming notification text to spoken audio through the Watch speaker
+- **Text-to-Speech** — Speaks announcements through the Watch speaker using AVSpeechSynthesizer
 - **Haptic Feedback** — Gentle tap when an announcement arrives
 - **Queue Management** — Multiple announcements are queued and spoken in order
-- **Extended Runtime** — Uses WKExtendedRuntimeSession to ensure speech completes even when you lower your wrist
+- **Background Delivery** — Triple-channel delivery (sendMessage + transferUserInfo + applicationContext) for reliability
+- **Complication** — Add to your watch face for quick access and improved background performance
 - **Settings Sync** — Speech rate and pitch sync from the iPhone app automatically
-
-### Shortcuts Automations
-
-The app provides an **"Announce on Watch"** Shortcuts action. Create automations in the Shortcuts app like:
-
-- "When I receive a message" → Announce on Watch
-- "When a Calendar event starts" → Announce on Watch
-- "When I arrive at a location" → Announce on Watch
-- "When an alarm goes off" → Announce on Watch
-
-## How It Works
-
-1. **Shortcuts Automations** trigger the "Announce on Watch" action when events occur on your iPhone
-2. The iPhone app sends the announcement text to the Apple Watch via **WatchConnectivity**
-3. The Watch app uses **AVSpeechSynthesizer** to speak the text through the Watch speaker
-4. A haptic tap accompanies each announcement so you know one is coming
-
-> **Note:** iOS sandboxing prevents third-party apps from directly intercepting other apps' notifications. This app bridges that gap using Apple's Shortcuts automations framework, giving you flexible control over which events trigger Watch announcements.
 
 ## Requirements
 
@@ -48,35 +37,48 @@ The app provides an **"Announce on Watch"** Shortcuts action. Create automations
 
 Install the app on your iPhone. The Watch app installs automatically on your paired Apple Watch.
 
-### 2. Configure Sources
+### 2. Test
 
-Open the iPhone app and toggle which notification sources you want announced. This filters announcements when they arrive via Shortcuts.
+Tap **"Send Test Announcement"** on the iPhone app to hear your Watch speak. If you hear the announcement, everything is connected.
 
-### 3. Test
+### 3. Add the Complication (Recommended)
 
-Tap **"Send Test Announcement"** to hear your Watch speak. If you hear the announcement, everything is connected.
+Long-press your watch face, tap **Edit**, and add the **Watch Speaks** complication. This improves background delivery reliability by giving the app more background execution time.
 
 ### 4. Set Up Automations
 
 1. Open the **Shortcuts** app on your iPhone
-2. Go to **Automations** → **New Automation**
-3. Choose a trigger (e.g., "Message", "Calendar", "Alarm")
+2. Go to **Automations** > **New Automation**
+3. Choose a trigger (e.g., "Message", "Calendar", "Alarm", "Arrive at Location")
 4. Add the **"Announce on Watch"** action (search for it)
-5. Set the text to announce
+5. Set the text to announce and optionally set the Source App name
 6. Enable **Run Immediately**
 7. Tap **Done**
 
-Repeat for each app or event you want announced on your Watch.
+Repeat for each event you want announced on your Watch.
 
-### 5. Verify Watch Connectivity
+### Example Automations
 
-Open the iPhone app and tap the gear icon → **About**. If the Watch App version appears, the Watch is communicating successfully. If it shows "—", open the Watch app to trigger a sync.
+| Trigger | Announce Text | Source |
+|---------|--------------|--------|
+| When I receive a message | "New message received" | Messages |
+| When a Calendar event starts | "Meeting starting now" | Calendar |
+| When I arrive at Work | "Arrived at work" | Location |
+| When an alarm goes off | "Time to wake up" | Alarm |
+
+## Architecture
+
+- **WatchConnectivity** — iPhone-to-Watch communication via `WCSession`
+- **AppIntents** — Provides the "Announce on Watch" Shortcuts action
+- **AVSpeechSynthesizer** — Text-to-speech on watchOS
+- **WidgetKit** — Watch face complication for background priority
+- **WKExtendedRuntimeSession** — Keeps the app alive during background speech
 
 ## Privacy
 
 - All communication stays between your iPhone and Apple Watch via WatchConnectivity
 - No data is transmitted to any external server
-- Notification content is processed locally and spoken on-device
+- Announcement text is processed locally and spoken on-device
 - No health data, location data, or personal information is collected
 
 ## License

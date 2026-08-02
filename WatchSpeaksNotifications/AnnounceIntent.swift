@@ -36,7 +36,7 @@ struct AnnounceShortcuts: AppShortcutsProvider {
             intent: AnnounceOnWatchIntent(),
             phrases: [
                 "Announce on Watch with \(.applicationName)",
-                "Speak notification with \(.applicationName)",
+                "Speak on Watch with \(.applicationName)",
             ],
             shortTitle: "Announce on Watch",
             systemImageName: "speaker.wave.3.fill"

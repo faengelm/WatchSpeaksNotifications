@@ -2,28 +2,6 @@ import Foundation
 import WatchConnectivity
 import SwiftUI
 
-struct NotificationSource: Identifiable, Codable, Hashable {
-    let id: String
-    let name: String
-    let icon: String
-    var isEnabled: Bool
-
-    static let defaults: [NotificationSource] = [
-        NotificationSource(id: "messages", name: "Messages", icon: "message.fill", isEnabled: true),
-        NotificationSource(id: "mail", name: "Mail", icon: "envelope.fill", isEnabled: true),
-        NotificationSource(id: "calendar", name: "Calendar", icon: "calendar", isEnabled: true),
-        NotificationSource(id: "reminders", name: "Reminders", icon: "checklist", isEnabled: true),
-        NotificationSource(id: "phone", name: "Phone", icon: "phone.fill", isEnabled: true),
-        NotificationSource(id: "facetime", name: "FaceTime", icon: "video.fill", isEnabled: false),
-        NotificationSource(id: "news", name: "News", icon: "newspaper.fill", isEnabled: false),
-        NotificationSource(id: "health", name: "Health", icon: "heart.fill", isEnabled: true),
-        NotificationSource(id: "home", name: "Home", icon: "house.fill", isEnabled: false),
-        NotificationSource(id: "weather", name: "Weather", icon: "cloud.sun.fill", isEnabled: false),
-        NotificationSource(id: "shortcuts", name: "Shortcuts", icon: "square.on.square", isEnabled: true),
-        NotificationSource(id: "other", name: "Other Apps", icon: "app.fill", isEnabled: false),
-    ]
-}
-
 class ConnectivityManager: NSObject, ObservableObject, WCSessionDelegate {
     static let shared = ConnectivityManager()
 
@@ -66,12 +44,6 @@ class ConnectivityManager: NSObject, ObservableObject, WCSessionDelegate {
         }
     }
 
-    // MARK: - Notification Sources
-
-    @Published var sources: [NotificationSource] = [] {
-        didSet { saveSources() }
-    }
-
     // MARK: - Announcement Log
 
     @Published var announcementLog: [AnnouncementEntry] = []
@@ -89,7 +61,6 @@ class ConnectivityManager: NSObject, ObservableObject, WCSessionDelegate {
     override init() {
         super.init()
         loadSettings()
-        loadSources()
         loadLog()
         start()
     }
@@ -151,7 +122,6 @@ class ConnectivityManager: NSObject, ObservableObject, WCSessionDelegate {
 
     func sendAnnouncement(text: String, source: String) {
         guard announcementsEnabled else { return }
-        guard isSourceEnabled(source) else { return }
         guard WCSession.default.activationState == .activated else { return }
 
         let messageId = UUID().uuidString
@@ -196,7 +166,7 @@ class ConnectivityManager: NSObject, ObservableObject, WCSessionDelegate {
 
     func sendTestAnnouncement() {
         sendAnnouncement(
-            text: "This is a test announcement from Watch Speaks Notifications",
+            text: "This is a test announcement from Watch Speaks",
             source: "Test"
         )
     }
@@ -230,25 +200,6 @@ class ConnectivityManager: NSObject, ObservableObject, WCSessionDelegate {
         try? WCSession.default.updateApplicationContext(context)
     }
 
-    // MARK: - Source Filtering
-
-    func isSourceEnabled(_ source: String) -> Bool {
-        let normalized = source.lowercased()
-        if normalized == "test" { return true }
-        if let match = sources.first(where: {
-            $0.name.lowercased() == normalized || $0.id == normalized
-        }) {
-            return match.isEnabled
-        }
-        return sources.first(where: { $0.id == "other" })?.isEnabled ?? true
-    }
-
-    func toggleSource(_ id: String, enabled: Bool) {
-        if let idx = sources.firstIndex(where: { $0.id == id }) {
-            sources[idx].isEnabled = enabled
-        }
-    }
-
     // MARK: - Persistence
 
     private func loadSettings() {
@@ -263,21 +214,6 @@ class ConnectivityManager: NSObject, ObservableObject, WCSessionDelegate {
         }
         if UserDefaults.standard.object(forKey: "prefixSourceName") != nil {
             prefixSourceName = UserDefaults.standard.bool(forKey: "prefixSourceName")
-        }
-    }
-
-    private func saveSources() {
-        if let data = try? JSONEncoder().encode(sources) {
-            UserDefaults.standard.set(data, forKey: "notificationSources")
-        }
-    }
-
-    private func loadSources() {
-        if let data = UserDefaults.standard.data(forKey: "notificationSources"),
-           let saved = try? JSONDecoder().decode([NotificationSource].self, from: data) {
-            sources = saved
-        } else {
-            sources = NotificationSource.defaults
         }
     }
 

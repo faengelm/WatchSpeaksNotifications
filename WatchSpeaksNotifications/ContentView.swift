@@ -10,7 +10,6 @@ struct ContentView: View {
         NavigationStack {
             List {
                 statusSection
-                sourcesSection
                 speechSection
                 testSection
                 if !sync.announcementLog.isEmpty {
@@ -71,27 +70,8 @@ struct ContentView: View {
             if sync.isWatchPaired {
                 Text("Announcements are delivered instantly when the Watch app is active, or queued for delivery when it\u{2019}s in the background.")
             } else {
-                Text("When enabled, selected notifications will be spoken aloud on your Apple Watch.")
+                Text("Pair an Apple Watch to start using Watch Speaks.")
             }
-        }
-    }
-
-    // MARK: - Notification Sources
-
-    private var sourcesSection: some View {
-        Section {
-            ForEach(sync.sources) { source in
-                Toggle(isOn: Binding(
-                    get: { source.isEnabled },
-                    set: { sync.toggleSource(source.id, enabled: $0) }
-                )) {
-                    Label(source.name, systemImage: source.icon)
-                }
-            }
-        } header: {
-            Text("Notification Sources")
-        } footer: {
-            Text("Choose which apps\u{2019} notifications are announced. Use the Shortcuts app to create automations that trigger the \u{201C}Announce on Watch\u{201D} action.")
         }
     }
 

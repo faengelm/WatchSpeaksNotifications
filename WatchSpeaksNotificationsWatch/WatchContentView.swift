@@ -82,7 +82,7 @@ struct WatchContentView: View {
         Section {
             Button {
                 SpeechManager.shared.speak(
-                    "This is a test announcement from Watch Speaks Notifications"
+                    "This is a test announcement from Watch Speaks"
                 )
             } label: {
                 Label("Test Speech", systemImage: "speaker.wave.3.fill")
