@@ -69,14 +69,6 @@ Repeat for each event you want announced on your Watch.
 | When an alarm goes off | "Time to wake up" | Alarm |
 | When an app sends a notification *(iOS 27+)* | "New notification from App" | App Notification |
 
-## Architecture
-
-- **WatchConnectivity** — iPhone-to-Watch communication via `WCSession`
-- **AppIntents** — Provides the "Announce on Watch" Shortcuts action
-- **AVSpeechSynthesizer** — Text-to-speech on watchOS
-- **WidgetKit** — Watch face complication for background priority
-- **WKExtendedRuntimeSession** — Keeps the app alive during background speech
-
 ## Privacy
 
 - All communication stays between your iPhone and Apple Watch via WatchConnectivity
