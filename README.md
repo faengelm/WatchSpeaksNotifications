@@ -35,7 +35,7 @@ An iOS + watchOS app that speaks announcements aloud on your Apple Watch. Using 
 
 ### 1. Install & Launch
 
-Install the app on your iPhone. The Watch app installs automatically on your paired Apple Watch.
+Install the app on your iPhone. Then open the **Watch** app on your iPhone, scroll to **Watch Speaks**, and tap **Install** to add it to your Apple Watch.
 
 ### 2. Test
 
@@ -57,6 +57,8 @@ Long-press your watch face, tap **Edit**, and add the **Watch Speaks** complicat
 
 Repeat for each event you want announced on your Watch.
 
+> **iOS 27 & later:** The Shortcuts app adds new automation triggers, including **App Notification** — letting you announce any app's notifications on your Watch automatically. Look for additional triggers as Apple expands Shortcuts in future releases.
+
 ### Example Automations
 
 | Trigger | Announce Text | Source |
@@ -65,6 +67,7 @@ Repeat for each event you want announced on your Watch.
 | When a Calendar event starts | "Meeting starting now" | Calendar |
 | When I arrive at Work | "Arrived at work" | Location |
 | When an alarm goes off | "Time to wake up" | Alarm |
+| When an app sends a notification *(iOS 27+)* | "New notification from App" | App Notification |
 
 ## Architecture
 
