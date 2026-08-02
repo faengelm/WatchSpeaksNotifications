@@ -7,7 +7,7 @@ An iOS + watchOS app that speaks announcements aloud on your Apple Watch. Using 
 1. You create an **automation** in the iPhone Shortcuts app (e.g., "When I receive a message")
 2. The automation runs the **"Announce on Watch"** action with the text you want spoken
 3. The iPhone sends the text to the Apple Watch via **WatchConnectivity**
-4. The Watch speaks it aloud through its built-in speaker with a haptic tap
+4. The Watch plays an alert chime, then speaks it aloud through its built-in speaker
 
 ## Features
 
@@ -20,9 +20,10 @@ An iOS + watchOS app that speaks announcements aloud on your Apple Watch. Using 
 
 ### Apple Watch App
 - **Text-to-Speech** — Speaks announcements through the Watch speaker using AVSpeechSynthesizer
-- **Haptic Feedback** — Gentle tap when an announcement arrives
+- **Alert Chime + Haptic** — Audible chime and vibration when an announcement arrives
 - **Queue Management** — Multiple announcements are queued and spoken in order
-- **Background Delivery** — Triple-channel delivery (sendMessage + transferUserInfo + applicationContext) for reliability
+- **Background Delivery** — Triple-channel delivery ensures announcements arrive even when the app is in the background
+- **Background Notifications** — When the app is in the background, a notification displays the announcement text; tap to open and hear it spoken
 - **Complication** — Add to your watch face for quick access and improved background performance
 - **Settings Sync** — Speech rate and pitch sync from the iPhone app automatically
 
@@ -37,15 +38,19 @@ An iOS + watchOS app that speaks announcements aloud on your Apple Watch. Using 
 
 Install the app on your iPhone. Then open the **Watch** app on your iPhone, scroll to **Watch Speaks**, and tap **Install** to add it to your Apple Watch.
 
-### 2. Test
+### 2. Allow Notifications
+
+On first launch, the Watch app will ask to send notifications. Tap **Allow** — this enables background announcement alerts when the app is not in the foreground.
+
+### 3. Test
 
 Tap **"Send Test Announcement"** on the iPhone app to hear your Watch speak. If you hear the announcement, everything is connected.
 
-### 3. Add the Complication (Recommended)
+### 4. Add the Complication (Recommended)
 
 Long-press your watch face, tap **Edit**, and add the **Watch Speaks** complication. This improves background delivery reliability by giving the app more background execution time.
 
-### 4. Set Up Automations
+### 5. Set Up Automations
 
 1. Open the **Shortcuts** app on your iPhone
 2. Go to **Automations** > **New Automation**
@@ -68,6 +73,16 @@ Repeat for each event you want announced on your Watch.
 | When I arrive at Work | "Arrived at work" | Location |
 | When an alarm goes off | "Time to wake up" | Alarm |
 | When an app sends a notification *(iOS 27+)* | "New notification from App" | App Notification |
+
+## Foreground vs. Background
+
+| Watch App State | What Happens |
+|----------------|-------------|
+| **Foreground** (app is open) | Instant speech + haptic — always reliable |
+| **Background** (watch face showing) | Alert chime + speech when watchOS delivers (may be instant or slightly delayed) |
+| **Missed delivery** | Notification appears in notification center; tap it to open the app and hear the announcement |
+
+> **Tip:** Adding the Watch Speaks complication to your watch face gives the app a higher background execution budget, improving delivery speed when the app is not in the foreground.
 
 ## Privacy
 
