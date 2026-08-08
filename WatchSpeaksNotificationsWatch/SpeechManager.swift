@@ -26,13 +26,13 @@ class SpeechManager: NSObject, ObservableObject {
     }
 
     func activateAudioSession() {
-        do {
-            let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playback, mode: .spokenAudio,
-                                    options: [.duckOthers])
-            try session.setActive(true)
-        } catch {
-            print("[Speech] Audio pre-activation: \(error)")
+        let session = AVAudioSession.sharedInstance()
+        try? session.setCategory(.playback, mode: .spokenAudio,
+                                 options: [.duckOthers])
+        session.activate(options: []) { activated, error in
+            if !activated {
+                print("[Speech] Audio pre-activation failed: \(String(describing: error))")
+            }
         }
     }
 
@@ -54,38 +54,42 @@ class SpeechManager: NSObject, ObservableObject {
     }
 
     private func performSpeak(_ text: String) {
-        // Activate audio session synchronously before speaking
-        do {
-            let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playback, mode: .spokenAudio,
-                                    options: [.duckOthers])
-            try session.setActive(true)
-        } catch {
-            DispatchQueue.main.async {
-                self.lastError = "Audio: \(error.localizedDescription)"
+        let session = AVAudioSession.sharedInstance()
+        try? session.setCategory(.playback, mode: .spokenAudio,
+                                 options: [.duckOthers])
+
+        // Use async activation — waits for the audio route to be ready on watchOS
+        session.activate(options: []) { [weak self] activated, error in
+            guard let self else { return }
+            if !activated {
+                DispatchQueue.main.async {
+                    self.lastError = "Audio: \(error?.localizedDescription ?? "not activated")"
+                }
+                print("[Speech] Audio session activation failed: \(String(describing: error))")
             }
-            print("[Speech] Audio session error: \(error)")
+
+            DispatchQueue.main.async {
+                let utterance = AVSpeechUtterance(string: text)
+                utterance.rate = self.speechRate
+                utterance.pitchMultiplier = self.speechPitch
+                utterance.volume = 1.0
+                utterance.preUtteranceDelay = 0.3
+                utterance.postUtteranceDelay = 0.2
+
+                if let voice = AVSpeechSynthesisVoice(language: "en-US") {
+                    utterance.voice = voice
+                }
+
+                // Track for retry if speech produces no audio
+                self.retryText = text
+
+                // Speak after audio route is confirmed ready
+                self.isSpeaking = true
+                self.lastSpokenText = text
+                self.lastError = nil
+                self.synthesizer.speak(utterance)
+            }
         }
-
-        let utterance = AVSpeechUtterance(string: text)
-        utterance.rate = speechRate
-        utterance.pitchMultiplier = speechPitch
-        utterance.volume = 1.0
-        utterance.preUtteranceDelay = 0.3
-        utterance.postUtteranceDelay = 0.2
-
-        if let voice = AVSpeechSynthesisVoice(language: "en-US") {
-            utterance.voice = voice
-        }
-
-        // Track for retry if speech produces no audio
-        retryText = text
-
-        // Speak immediately — no nested async dispatch
-        isSpeaking = true
-        lastSpokenText = text
-        lastError = nil
-        synthesizer.speak(utterance)
     }
 
     private func finishSpeaking() {

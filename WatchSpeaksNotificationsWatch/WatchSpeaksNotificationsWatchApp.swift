@@ -95,5 +95,8 @@ struct WatchSpeaksNotificationsWatchApp: App {
         WindowGroup {
             WatchContentView()
         }
+
+        // Long-look notification scene — speaks announcement when notification is displayed
+        WKNotificationScene(controller: NotificationController.self, category: "ANNOUNCEMENT")
     }
 }

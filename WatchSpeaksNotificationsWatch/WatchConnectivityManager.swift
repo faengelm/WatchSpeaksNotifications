@@ -113,6 +113,11 @@ class WatchConnectivityManager: NSObject, ObservableObject, WCSessionDelegate {
 
     // MARK: - Speak Pending on Foreground
 
+    /// Clears pending speech (called by NotificationController when long-look speaks it).
+    func clearPendingSpeech() {
+        pendingSpeech = nil
+    }
+
     /// Called when the app enters the foreground. If there is a pending
     /// announcement that couldn't be spoken in the background, speak it now.
     func speakPendingIfNeeded() {
@@ -243,6 +248,8 @@ class WatchConnectivityManager: NSObject, ObservableObject, WCSessionDelegate {
         content.body = text
         content.interruptionLevel = .timeSensitive
         content.categoryIdentifier = "ANNOUNCEMENT"
+        // Include spoken text for NotificationController long-look speech
+        content.userInfo = ["spokenText": text]
 
         let request = UNNotificationRequest(
             identifier: "announce-\(UUID().uuidString)",
