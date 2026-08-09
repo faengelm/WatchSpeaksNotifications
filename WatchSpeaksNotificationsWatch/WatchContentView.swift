@@ -53,11 +53,18 @@ struct WatchContentView: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(speech.isSpeaking ? "Speaking..." : "Ready")
                         .font(.headline)
-                    Text(connectivity.announcementsEnabled
-                         ? "Announcements On"
-                         : "Paused")
+                    Text(speech.isSpeaking
+                         ? "Tap to cancel"
+                         : (connectivity.announcementsEnabled
+                            ? "Announcements On"
+                            : "Paused"))
                         .font(.caption2)
                         .foregroundStyle(.secondary)
+                }
+            }
+            .onTapGesture {
+                if speech.isSpeaking {
+                    speech.cancelSpeech()
                 }
             }
 

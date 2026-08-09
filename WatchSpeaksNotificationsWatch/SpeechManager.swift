@@ -10,6 +10,8 @@ class SpeechManager: NSObject, ObservableObject {
     private var retryText: String?
     private var retryCount = 0
     private static let maxRetries = 2
+    private var speechTimeoutWork: DispatchWorkItem?
+    private static let speechTimeout: TimeInterval = 30
 
     @Published var isSpeaking = false
     @Published var lastSpokenText: String?
@@ -88,11 +90,43 @@ class SpeechManager: NSObject, ObservableObject {
                 self.lastSpokenText = text
                 self.lastError = nil
                 self.synthesizer.speak(utterance)
+                self.startSpeechTimeout()
             }
         }
     }
 
+    // MARK: - Speech Timeout
+
+    private func startSpeechTimeout() {
+        speechTimeoutWork?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            guard let self, self.isSpeaking else { return }
+            print("[Speech] Timeout — force-resetting stuck synthesizer")
+            self.synthesizer.stopSpeaking(at: .immediate)
+            self.pendingAnnouncements.removeAll()
+            self.finishSpeaking()
+        }
+        speechTimeoutWork = work
+        DispatchQueue.main.asyncAfter(
+            deadline: .now() + SpeechManager.speechTimeout, execute: work
+        )
+    }
+
+    private func cancelSpeechTimeout() {
+        speechTimeoutWork?.cancel()
+        speechTimeoutWork = nil
+    }
+
+    /// Force-cancel speech — called when user taps "Speaking..." status
+    func cancelSpeech() {
+        synthesizer.stopSpeaking(at: .immediate)
+        pendingAnnouncements.removeAll()
+        cancelSpeechTimeout()
+        finishSpeaking()
+    }
+
     private func finishSpeaking() {
+        cancelSpeechTimeout()
         isSpeaking = false
         retryText = nil
         retryCount = 0
