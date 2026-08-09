@@ -4,7 +4,7 @@ import WatchConnectivity
 struct AnnounceOnWatchIntent: AppIntent {
     static var title: LocalizedStringResource = "Announce on Watch"
     static var description = IntentDescription(
-        "Speaks text aloud on your Apple Watch speaker"
+        "Speaks text aloud on your Watch speaker"
     )
 
     @Parameter(title: "Text to Announce")

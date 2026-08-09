@@ -24,9 +24,5 @@
 	<true/>
 	<key>WKCompanionAppBundleIdentifier</key>
 	<string>com.watchspeaksnotifications.app</string>
-	<key>WKBackgroundModes</key>
-	<array>
-		<string>audio</string>
-	</array>
 </dict>
 </plist>
