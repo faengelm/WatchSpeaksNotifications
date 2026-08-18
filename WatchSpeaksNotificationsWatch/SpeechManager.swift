@@ -24,18 +24,6 @@ class SpeechManager: NSObject, ObservableObject {
     override init() {
         super.init()
         synthesizer.delegate = self
-        activateAudioSession()
-    }
-
-    func activateAudioSession() {
-        do {
-            let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playback, mode: .spokenAudio,
-                                    options: [.duckOthers])
-            try session.setActive(true)
-        } catch {
-            print("[Speech] Audio pre-activation: \(error)")
-        }
     }
 
     func speak(_ text: String, source: String? = nil, prefixSource: Bool = true) {
@@ -56,33 +44,39 @@ class SpeechManager: NSObject, ObservableObject {
     }
 
     private func performSpeak(_ text: String) {
-        do {
-            let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playback, mode: .spokenAudio,
-                                    options: [.duckOthers])
-            try session.setActive(true)
-        } catch {
-            lastError = "Audio: \(error.localizedDescription)"
-            print("[Speech] Audio session error: \(error)")
+        let session = AVAudioSession.sharedInstance()
+        try? session.setCategory(.playback, mode: .default, options: [.duckOthers])
+
+        // Async activation — waits for the audio route to be ready (SmartBottleTalk pattern)
+        session.activate(options: []) { [weak self] activated, error in
+            guard activated, let self else {
+                DispatchQueue.main.async {
+                    self?.lastError = "Audio: \(error?.localizedDescription ?? "not activated")"
+                    self?.finishSpeaking()
+                }
+                return
+            }
+
+            DispatchQueue.main.async {
+                let utterance = AVSpeechUtterance(string: text)
+                utterance.rate = self.speechRate
+                utterance.pitchMultiplier = self.speechPitch
+                utterance.volume = 1.0
+                utterance.preUtteranceDelay = 0.3
+                utterance.postUtteranceDelay = 0.2
+
+                if let voice = AVSpeechSynthesisVoice(language: "en-US") {
+                    utterance.voice = voice
+                }
+
+                self.retryText = text
+                self.isSpeaking = true
+                self.lastSpokenText = text
+                self.lastError = nil
+                self.synthesizer.speak(utterance)
+                self.startSpeechTimeout()
+            }
         }
-
-        let utterance = AVSpeechUtterance(string: text)
-        utterance.rate = speechRate
-        utterance.pitchMultiplier = speechPitch
-        utterance.volume = 1.0
-        utterance.preUtteranceDelay = 0.3
-        utterance.postUtteranceDelay = 0.2
-
-        if let voice = AVSpeechSynthesisVoice(language: "en-US") {
-            utterance.voice = voice
-        }
-
-        retryText = text
-        isSpeaking = true
-        lastSpokenText = text
-        lastError = nil
-        synthesizer.speak(utterance)
-        startSpeechTimeout()
     }
 
     // MARK: - Speech Timeout
@@ -127,9 +121,6 @@ class SpeechManager: NSObject, ObservableObject {
         isSpeaking = false
         retryText = nil
         retryCount = 0
-        try? AVAudioSession.sharedInstance().setActive(
-            false, options: .notifyOthersOnDeactivation
-        )
         onComplete?()
         onComplete = nil
     }

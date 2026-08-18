@@ -195,11 +195,12 @@ class ConnectivityManager: NSObject, ObservableObject, WCSessionDelegate {
         content.categoryIdentifier = "ANNOUNCEMENT"
         content.userInfo = ["spokenText": text]
         content.sound = .default
+        content.interruptionLevel = .timeSensitive   // break through focus modes
 
         let request = UNNotificationRequest(
             identifier: "announce-\(UUID().uuidString)",
             content: content,
-            trigger: UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
+            trigger: nil  // immediate delivery (SmartBottleTalk pattern)
         )
 
         UNUserNotificationCenter.current().add(request) { error in
