@@ -73,17 +73,6 @@ struct WatchContentView: View {
                     .font(.caption2)
                     .foregroundStyle(.red)
             }
-
-            if let lastWake = connectivity.lastBackgroundWake {
-                HStack {
-                    Image(systemName: "moon.fill")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                    Text("Last bg wake: \(lastWake, format: .dateTime.hour().minute().second())")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-            }
         }
     }
 

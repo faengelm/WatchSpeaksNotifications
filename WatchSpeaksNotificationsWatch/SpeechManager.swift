@@ -5,13 +5,13 @@ import WatchKit
 class SpeechManager: NSObject, ObservableObject {
     static let shared = SpeechManager()
 
-    private let synthesizer = AVSpeechSynthesizer()
+    private var synthesizer = AVSpeechSynthesizer()
     private var pendingAnnouncements: [String] = []
     private var retryText: String?
     private var retryCount = 0
-    private static let maxRetries = 2
+    private static let maxRetries = 1
     private var speechTimeoutWork: DispatchWorkItem?
-    private static let speechTimeout: TimeInterval = 30
+    private static let speechTimeout: TimeInterval = 10
 
     @Published var isSpeaking = false
     @Published var lastSpokenText: String?
@@ -28,13 +28,13 @@ class SpeechManager: NSObject, ObservableObject {
     }
 
     func activateAudioSession() {
-        let session = AVAudioSession.sharedInstance()
-        try? session.setCategory(.playback, mode: .spokenAudio,
-                                 options: [.duckOthers])
-        session.activate(options: []) { activated, error in
-            if !activated {
-                print("[Speech] Audio pre-activation failed: \(String(describing: error))")
-            }
+        do {
+            let session = AVAudioSession.sharedInstance()
+            try session.setCategory(.playback, mode: .spokenAudio,
+                                    options: [.duckOthers])
+            try session.setActive(true)
+        } catch {
+            print("[Speech] Audio pre-activation: \(error)")
         }
     }
 
@@ -56,53 +56,50 @@ class SpeechManager: NSObject, ObservableObject {
     }
 
     private func performSpeak(_ text: String) {
-        let session = AVAudioSession.sharedInstance()
-        try? session.setCategory(.playback, mode: .spokenAudio,
-                                 options: [.duckOthers])
-
-        // Use async activation — waits for the audio route to be ready on watchOS
-        session.activate(options: []) { [weak self] activated, error in
-            guard let self else { return }
-            if !activated {
-                DispatchQueue.main.async {
-                    self.lastError = "Audio: \(error?.localizedDescription ?? "not activated")"
-                }
-                print("[Speech] Audio session activation failed: \(String(describing: error))")
-            }
-
-            DispatchQueue.main.async {
-                let utterance = AVSpeechUtterance(string: text)
-                utterance.rate = self.speechRate
-                utterance.pitchMultiplier = self.speechPitch
-                utterance.volume = 1.0
-                utterance.preUtteranceDelay = 0.3
-                utterance.postUtteranceDelay = 0.2
-
-                if let voice = AVSpeechSynthesisVoice(language: "en-US") {
-                    utterance.voice = voice
-                }
-
-                // Track for retry if speech produces no audio
-                self.retryText = text
-
-                // Speak after audio route is confirmed ready
-                self.isSpeaking = true
-                self.lastSpokenText = text
-                self.lastError = nil
-                self.synthesizer.speak(utterance)
-                self.startSpeechTimeout()
-            }
+        do {
+            let session = AVAudioSession.sharedInstance()
+            try session.setCategory(.playback, mode: .spokenAudio,
+                                    options: [.duckOthers])
+            try session.setActive(true)
+        } catch {
+            lastError = "Audio: \(error.localizedDescription)"
+            print("[Speech] Audio session error: \(error)")
         }
+
+        let utterance = AVSpeechUtterance(string: text)
+        utterance.rate = speechRate
+        utterance.pitchMultiplier = speechPitch
+        utterance.volume = 1.0
+        utterance.preUtteranceDelay = 0.3
+        utterance.postUtteranceDelay = 0.2
+
+        if let voice = AVSpeechSynthesisVoice(language: "en-US") {
+            utterance.voice = voice
+        }
+
+        retryText = text
+        isSpeaking = true
+        lastSpokenText = text
+        lastError = nil
+        synthesizer.speak(utterance)
+        startSpeechTimeout()
     }
 
     // MARK: - Speech Timeout
+
+    private func resetSynthesizer() {
+        synthesizer.stopSpeaking(at: .immediate)
+        synthesizer = AVSpeechSynthesizer()
+        synthesizer.delegate = self
+        print("[Speech] Synthesizer recreated")
+    }
 
     private func startSpeechTimeout() {
         speechTimeoutWork?.cancel()
         let work = DispatchWorkItem { [weak self] in
             guard let self, self.isSpeaking else { return }
-            print("[Speech] Timeout — force-resetting stuck synthesizer")
-            self.synthesizer.stopSpeaking(at: .immediate)
+            print("[Speech] Timeout — recreating stuck synthesizer")
+            self.resetSynthesizer()
             self.pendingAnnouncements.removeAll()
             self.finishSpeaking()
         }
@@ -119,7 +116,7 @@ class SpeechManager: NSObject, ObservableObject {
 
     /// Force-cancel speech — called when user taps "Speaking..." status
     func cancelSpeech() {
-        synthesizer.stopSpeaking(at: .immediate)
+        resetSynthesizer()
         pendingAnnouncements.removeAll()
         cancelSpeechTimeout()
         finishSpeaking()
@@ -161,7 +158,6 @@ extension SpeechManager: AVSpeechSynthesizerDelegate {
 
     func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
         DispatchQueue.main.async {
-            // Retry on cancel — watchOS sometimes cancels when audio route isn't ready
             if let text = self.retryText, self.retryCount < SpeechManager.maxRetries {
                 self.retryCount += 1
                 print("[Speech] Cancelled, retrying (\(self.retryCount)/\(SpeechManager.maxRetries))")

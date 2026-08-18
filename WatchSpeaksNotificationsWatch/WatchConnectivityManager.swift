@@ -3,21 +3,27 @@ import WatchConnectivity
 import WatchKit
 import UserNotifications
 
+/// Minimal Watch connectivity — matches SmartBottleTalk's architecture.
+/// Receives settings from iPhone and handles foreground speech.
+/// Background speech is handled entirely by iPhone notification mirroring →
+/// WKNotificationScene → NotificationController (no Watch-side notifications).
 class WatchConnectivityManager: NSObject, ObservableObject, WCSessionDelegate {
     static let shared = WatchConnectivityManager()
 
     @Published var announcementsEnabled = true
     @Published var prefixSourceName = true
-    @Published var lastBackgroundWake: Date?
     @Published var notificationsAllowed: Bool?
 
     private var hasStarted = false
     private var processedIds = Set<String>()
-    private var pendingBackgroundTasks: [WKRefreshBackgroundTask] = []
-    private var extendedSession: WKExtendedRuntimeSession?
 
     // Pending speech for when app returns to foreground
     private(set) var pendingSpeech: (text: String, source: String?, prefixSource: Bool)?
+
+    override init() {
+        super.init()
+        start()
+    }
 
     func start() {
         guard !hasStarted else { return }
@@ -48,47 +54,6 @@ class WatchConnectivityManager: NSObject, ObservableObject, WCSessionDelegate {
                 self.notificationsAllowed = settings.authorizationStatus == .authorized
             }
         }
-    }
-
-    // MARK: - Extended Runtime Session (background only)
-
-    func startBackgroundSession() {
-        guard extendedSession == nil || extendedSession?.state == .invalid else { return }
-        let session = WKExtendedRuntimeSession()
-        session.delegate = self
-        session.start()
-        extendedSession = session
-    }
-
-    func endBackgroundSession() {
-        extendedSession?.invalidate()
-        extendedSession = nil
-    }
-
-    // MARK: - Background Task Management
-
-    func addPendingTask(_ task: WKRefreshBackgroundTask) {
-        pendingBackgroundTasks.append(task)
-        DispatchQueue.main.async {
-            self.lastBackgroundWake = Date()
-        }
-    }
-
-    func completeTask(_ task: WKRefreshBackgroundTask) {
-        guard pendingBackgroundTasks.contains(where: { $0 === task }) else { return }
-        task.setTaskCompletedWithSnapshot(false)
-        pendingBackgroundTasks.removeAll(where: { $0 === task })
-        if pendingBackgroundTasks.isEmpty {
-            endBackgroundSession()
-        }
-    }
-
-    func completeAllPendingTasks() {
-        for task in pendingBackgroundTasks {
-            task.setTaskCompletedWithSnapshot(false)
-        }
-        pendingBackgroundTasks.removeAll()
-        endBackgroundSession()
     }
 
     // MARK: - WCSessionDelegate
@@ -202,81 +167,23 @@ class WatchConnectivityManager: NSObject, ObservableObject, WCSessionDelegate {
 
         guard !text.isEmpty else { return }
 
-        let isForeground = WKApplication.shared().applicationState == .active
-
         DispatchQueue.main.async {
+            let isForeground = WKApplication.shared().applicationState == .active
+
             if isForeground {
-                // Foreground: speak immediately with haptic
+                // Foreground: haptic + speak directly
                 WKInterfaceDevice.current().play(.click)
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
                     SpeechManager.shared.speak(text, source: source, prefixSource: prefixSource)
                 }
             } else {
-                // Background: chime first, then try to speak, then post notification
+                // Background: store for foreground recovery.
+                // Speech is handled by iPhone notification mirroring →
+                // WKNotificationScene → NotificationController.
                 self.pendingSpeech = (text: text, source: source, prefixSource: prefixSource)
-                self.startBackgroundSession()
-
-                // Play system chime BEFORE activating speech audio session
-                WKInterfaceDevice.current().play(.notification)
-
-                // After chime, activate audio session and try to speak
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-                    SpeechManager.shared.activateAudioSession()
-                    SpeechManager.shared.speak(text, source: source, prefixSource: prefixSource)
-                }
-
-                // Post notification so text is visible in notification center
-                self.postAnnouncementNotification(text: text, source: source)
-            }
-
-            if !self.pendingBackgroundTasks.isEmpty || self.extendedSession != nil {
-                SpeechManager.shared.onComplete = { [weak self] in
-                    self?.pendingSpeech = nil  // Speech succeeded, clear pending
-                    self?.completeAllPendingTasks()
-                }
             }
 
             self.sendState()
         }
-    }
-
-    // MARK: - Local Notifications
-
-    private func postAnnouncementNotification(text: String, source: String?) {
-        let content = UNMutableNotificationContent()
-        content.title = source ?? "Watch Speaks"
-        content.body = text
-        content.interruptionLevel = .timeSensitive
-        content.categoryIdentifier = "ANNOUNCEMENT"
-        // Include spoken text for NotificationController long-look speech
-        content.userInfo = ["spokenText": text]
-
-        let request = UNNotificationRequest(
-            identifier: "announce-\(UUID().uuidString)",
-            content: content,
-            trigger: nil  // Deliver immediately
-        )
-
-        UNUserNotificationCenter.current().add(request) { error in
-            if let error = error {
-                print("[Watch] Notification error: \(error)")
-            }
-        }
-    }
-}
-
-// MARK: - WKExtendedRuntimeSessionDelegate
-
-extension WatchConnectivityManager: WKExtendedRuntimeSessionDelegate {
-    func extendedRuntimeSessionDidStart(_ session: WKExtendedRuntimeSession) {}
-
-    func extendedRuntimeSessionWillExpire(_ session: WKExtendedRuntimeSession) {}
-
-    func extendedRuntimeSession(
-        _ session: WKExtendedRuntimeSession,
-        didInvalidateWith reason: WKExtendedRuntimeSessionInvalidationReason,
-        error: (any Error)?
-    ) {
-        extendedSession = nil
     }
 }

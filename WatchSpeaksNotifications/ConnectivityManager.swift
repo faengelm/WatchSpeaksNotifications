@@ -1,6 +1,7 @@
 import Foundation
 import WatchConnectivity
 import SwiftUI
+import UserNotifications
 
 class ConnectivityManager: NSObject, ObservableObject, WCSessionDelegate {
     static let shared = ConnectivityManager()
@@ -63,6 +64,24 @@ class ConnectivityManager: NSObject, ObservableObject, WCSessionDelegate {
         loadSettings()
         loadLog()
         start()
+        setupNotifications()
+    }
+
+    // MARK: - Notification Setup (for Watch mirroring)
+
+    private func setupNotifications() {
+        let center = UNUserNotificationCenter.current()
+        center.requestAuthorization(options: [.alert, .sound]) { granted, error in
+            print("[Phone] Notification permission: \(granted), error: \(String(describing: error))")
+        }
+        // Register category so watchOS routes mirrored notifications
+        // to the Watch's WKNotificationScene / NotificationController
+        let category = UNNotificationCategory(
+            identifier: "ANNOUNCEMENT",
+            actions: [],
+            intentIdentifiers: [],
+            options: [])
+        center.setNotificationCategories([category])
     }
 
     func start() {
@@ -162,6 +181,32 @@ class ConnectivityManager: NSObject, ObservableObject, WCSessionDelegate {
         // Channel 3: Embed in application context so Watch gets it on ANY wake-up
         latestAnnouncementForContext = message
         syncSettings()
+
+        // Channel 4: Post iPhone notification — watchOS mirrors it to Watch,
+        // triggering WKNotificationScene / NotificationController for reliable
+        // background speech (SmartBottleTalk pattern)
+        postAnnouncementNotification(text: text, source: source)
+    }
+
+    private func postAnnouncementNotification(text: String, source: String) {
+        let content = UNMutableNotificationContent()
+        content.title = source == "Test" ? "Watch Speaks" : source
+        content.body = text
+        content.categoryIdentifier = "ANNOUNCEMENT"
+        content.userInfo = ["spokenText": text]
+        content.sound = .default
+
+        let request = UNNotificationRequest(
+            identifier: "announce-\(UUID().uuidString)",
+            content: content,
+            trigger: UNTimeIntervalNotificationTrigger(timeInterval: 1, repeats: false)
+        )
+
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error = error {
+                print("[Phone] Notification error: \(error)")
+            }
+        }
     }
 
     func sendTestAnnouncement() {
