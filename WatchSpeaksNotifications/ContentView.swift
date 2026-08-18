@@ -144,11 +144,11 @@ struct ContentView: View {
             if let granted = sync.notificationPermission {
                 HStack {
                     Image(systemName: granted ? "bell.badge.fill" : "bell.slash.fill")
-                        .foregroundStyle(granted ? .green : .red)
+                        .foregroundColor(granted ? .green : .red)
                         .font(.caption)
                     Text(granted ? "iPhone Notifications Allowed" : "iPhone Notifications DENIED")
                         .font(.caption)
-                        .foregroundStyle(granted ? .secondary : .red)
+                        .foregroundColor(granted ? .gray : .red)
                 }
             }
         } header: {
