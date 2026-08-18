@@ -135,10 +135,17 @@ struct ContentView: View {
                         .foregroundColor(granted ? .gray : .red)
                 }
             }
+            Label {
+                Text("You MUST lock your iPhone after tapping Send. Notifications only mirror to your Watch when the iPhone is locked.")
+                    .font(.caption)
+            } icon: {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundColor(.orange)
+            }
         } header: {
             Text("Testing")
         } footer: {
-            Text("Schedules a test announcement so you can lock your iPhone first. The notification mirrors to your Watch and speaks aloud.\n\nCheck: Watch app \u{2192} My Watch \u{2192} Notifications \u{2192} Watch Speaks \u{2192} Mirror iPhone Alerts is ON.")
+            Text("Check: Watch app \u{2192} My Watch \u{2192} Notifications \u{2192} Watch Speaks \u{2192} Mirror iPhone Alerts is ON.\n\nUsing Focus mode? Add Watch Speaks to your Focus filter\u{2019}s allowed apps so notifications are not silenced.")
         }
     }
 

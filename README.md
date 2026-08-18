@@ -77,14 +77,24 @@ When prompted, allow notifications on your iPhone — this is required for the n
 
 Open the **Watch** app on your iPhone → **My Watch** → **Notifications** → scroll to **Watch Speaks** → ensure **Mirror iPhone Alerts** is ON.
 
-### 4. Test
+### 4. Focus Mode (if applicable)
+
+If you use a **Focus mode** (Do Not Disturb, Work, Sleep, etc.), you must add Watch Speaks to the Focus filter's **allowed apps** — otherwise notifications will be silenced and won't mirror to your Watch:
+
+1. Open **Settings** → **Focus** → select your active Focus
+2. Under **Allowed Notifications**, tap **Apps**
+3. Add **Watch Speaks** to the list
+
+### 5. Test
 
 1. In the iPhone app, pick a delay (e.g., 15 seconds)
 2. Tap **"Send test announcement"**
-3. **Lock your iPhone** immediately (press the side button)
+3. **Lock your iPhone immediately** (press the side button) — notifications only mirror to the Watch when the iPhone is locked
 4. Wait for the delay — the notification mirrors to your Watch and speaks aloud
 
-### 5. Set Up Automations
+> **The iPhone must be locked.** If the iPhone is unlocked, notifications display on the iPhone screen instead of mirroring to the Watch. This is how all iPhone-to-Watch notification mirroring works — it is not specific to Watch Speaks.
+
+### 6. Set Up Automations
 
 1. Open the **Shortcuts** app on your iPhone
 2. Go to **Automations** > **New Automation**
@@ -114,6 +124,8 @@ Repeat for each event you want announced on your Watch.
 | **iPhone unlocked** | Notification shows on iPhone; mirrors to Watch when iPhone is next locked |
 
 > **Important:** Notification mirroring requires the iPhone to be **locked**. When the iPhone is unlocked, notifications display on the iPhone instead of mirroring to the Watch. For automations triggered while the phone is in your pocket (locked), speech happens automatically.
+
+> **Focus mode:** If a Focus mode is active (Do Not Disturb, Work, Sleep, etc.), add Watch Speaks to the Focus filter's allowed apps. Otherwise, notifications are silenced and won't mirror to the Watch.
 
 ## Privacy
 
