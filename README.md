@@ -6,8 +6,11 @@ An iOS + watchOS app that speaks announcements aloud on your Apple Watch. Using 
 
 1. You create an **automation** in the iPhone Shortcuts app (e.g., "When I receive a message")
 2. The automation runs the **"Announce on Watch"** action with the text you want spoken
-3. The iPhone sends the text to the Apple Watch via **WatchConnectivity**
-4. The Watch plays an alert chime, then speaks it aloud through its built-in speaker
+3. The iPhone posts a **time-sensitive notification** with the announcement text
+4. watchOS **mirrors** the notification to the Apple Watch
+5. The Watch's custom **notification long-look** (WKNotificationScene) speaks the text aloud through AVSpeechSynthesizer
+
+This architecture matches the proven SmartBottleTalk pattern: the iPhone posts all notifications, watchOS mirrors them to the Watch, and the Watch speaks during the notification long-look — a foreground moment where audio playback is permitted.
 
 ## Features
 
@@ -15,17 +18,45 @@ An iOS + watchOS app that speaks announcements aloud on your Apple Watch. Using 
 - **Shortcuts Action** — "Announce on Watch" action available in the Shortcuts app for building automations
 - **Speech Customization** — Adjust speech rate and pitch to your preference
 - **Source Prefix** — Optionally say the source app name before each announcement (e.g., "Calendar: Meeting in 15 minutes")
-- **Test Button** — Send a test announcement to verify your Watch speaker
+- **Delayed Test** — Schedule a test announcement with a configurable delay so you can lock your iPhone first
 - **Announcement Log** — View recent announcements with delivery status and timestamps
+- **Notification Permission Status** — Shows whether iPhone notifications are enabled
 
 ### Apple Watch App
 - **Text-to-Speech** — Speaks announcements through the Watch speaker using AVSpeechSynthesizer
-- **Alert Chime + Haptic** — Audible chime and vibration when an announcement arrives
+- **Notification Long-Look Speech** — Custom WKNotificationScene speaks announcements when the notification is displayed
+- **Haptic Feedback** — Vibration when an announcement arrives in the foreground
 - **Queue Management** — Multiple announcements are queued and spoken in order
-- **Background Delivery** — Triple-channel delivery ensures announcements arrive even when the app is in the background
-- **Background Notifications** — When the app is in the background, a notification displays the announcement text; tap to open and hear it spoken
-- **Complication** — Add to your watch face for quick access and improved background performance
+- **Stuck Speech Recovery** — 10-second timeout with automatic synthesizer recreation, plus tap-to-cancel
 - **Settings Sync** — Speech rate and pitch sync from the iPhone app automatically
+
+## Architecture
+
+Watch Speaks uses **iPhone notification mirroring** for reliable background speech:
+
+```
+iPhone                          watchOS                        Watch App
+  |                               |                              |
+  |  Post notification            |                              |
+  |  (.timeSensitive,             |                              |
+  |   category: ANNOUNCEMENT)     |                              |
+  |------------------------------>|                              |
+  |                               |  Mirror to Watch             |
+  |                               |  (iPhone locked)             |
+  |                               |----------------------------->|
+  |                               |                              |
+  |                               |  WKNotificationScene         |
+  |                               |  matches "ANNOUNCEMENT"      |
+  |                               |  → NotificationController    |
+  |                               |  → didReceive()              |
+  |                               |  → SpeechManager.speak()     |
+```
+
+**Key design decisions:**
+- The Watch uses **zero** `UNUserNotificationCenter` — no permission requests, no category registration, no local notifications
+- Background speech relies entirely on iPhone notification mirroring → WKNotificationScene
+- Foreground speech uses direct WCSession message delivery + AVSpeechSynthesizer
+- The iPhone has the `com.apple.developer.usernotifications.time-sensitive` entitlement for reliable notification delivery
 
 ## Requirements
 
@@ -36,19 +67,22 @@ An iOS + watchOS app that speaks announcements aloud on your Apple Watch. Using 
 
 ### 1. Install & Launch
 
-Install the app on your iPhone. Then open the **Watch** app on your iPhone, scroll to **Watch Speaks**, and tap **Install** to add it to your Apple Watch.
+Install the app on your iPhone. The Watch app installs automatically on your paired Apple Watch.
 
 ### 2. Allow Notifications
 
-On first launch, the Watch app will ask to send notifications. Tap **Allow** — this enables background announcement alerts when the app is not in the foreground.
+When prompted, allow notifications on your iPhone — this is required for the notification mirroring that enables Watch speech.
 
-### 3. Test
+### 3. Verify Watch Notification Settings
 
-Tap **"Send Test Announcement"** on the iPhone app to hear your Watch speak. If you hear the announcement, everything is connected.
+Open the **Watch** app on your iPhone → **My Watch** → **Notifications** → scroll to **Watch Speaks** → ensure **Mirror iPhone Alerts** is ON.
 
-### 4. Add the Complication (Recommended)
+### 4. Test
 
-Long-press your watch face, tap **Edit**, and add the **Watch Speaks** complication. This improves background delivery reliability by giving the app more background execution time.
+1. In the iPhone app, pick a delay (e.g., 15 seconds)
+2. Tap **"Send test announcement"**
+3. **Lock your iPhone** immediately (press the side button)
+4. Wait for the delay — the notification mirrors to your Watch and speaks aloud
 
 ### 5. Set Up Automations
 
@@ -62,8 +96,6 @@ Long-press your watch face, tap **Edit**, and add the **Watch Speaks** complicat
 
 Repeat for each event you want announced on your Watch.
 
-> **iOS 27 & later:** The Shortcuts app adds new automation triggers, including **App Notification** — letting you announce any app's notifications on your Watch automatically. Look for additional triggers as Apple expands Shortcuts in future releases.
-
 ### Example Automations
 
 | Trigger | Announce Text | Source |
@@ -72,21 +104,20 @@ Repeat for each event you want announced on your Watch.
 | When a Calendar event starts | "Meeting starting now" | Calendar |
 | When I arrive at Work | "Arrived at work" | Location |
 | When an alarm goes off | "Time to wake up" | Alarm |
-| When an app sends a notification *(iOS 27+)* | "New notification from App" | App Notification |
 
 ## Foreground vs. Background
 
 | Watch App State | What Happens |
 |----------------|-------------|
-| **Foreground** (app is open) | Instant speech + haptic — always reliable |
-| **Background** (watch face showing) | Alert chime + speech when watchOS delivers (may be instant or slightly delayed) |
-| **Missed delivery** | Notification appears in notification center; tap it to open the app and hear the announcement |
+| **Foreground** (app is open) | Instant speech + haptic via WCSession |
+| **Background** (watch face showing) | iPhone notification mirrors to Watch → long-look speaks the text |
+| **iPhone unlocked** | Notification shows on iPhone; mirrors to Watch when iPhone is next locked |
 
-> **Tip:** Adding the Watch Speaks complication to your watch face gives the app a higher background execution budget, improving delivery speed when the app is not in the foreground.
+> **Important:** Notification mirroring requires the iPhone to be **locked**. When the iPhone is unlocked, notifications display on the iPhone instead of mirroring to the Watch. For automations triggered while the phone is in your pocket (locked), speech happens automatically.
 
 ## Privacy
 
-- All communication stays between your iPhone and Apple Watch via WatchConnectivity
+- All communication stays between your iPhone and Apple Watch
 - No data is transmitted to any external server
 - Announcement text is processed locally and spoken on-device
 - No health data, location data, or personal information is collected

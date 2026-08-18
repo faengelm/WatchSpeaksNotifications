@@ -4,7 +4,6 @@ struct ContentView: View {
     @ObservedObject private var sync = ConnectivityManager.shared
 
     @State private var showingAbout = false
-    @State private var testSent = false
     @State private var testDelay: TimeInterval = 60
     @State private var testScheduled = false
 
@@ -70,7 +69,7 @@ struct ContentView: View {
             Text("Status")
         } footer: {
             if sync.isWatchPaired {
-                Text("Announcements are delivered instantly when the Watch app is active, or queued for delivery when it\u{2019}s in the background.")
+                Text("Announcements are spoken instantly when the Watch app is active. In the background, a notification mirrors to your Watch and speaks during the long-look.")
             } else {
                 Text("Pair an Apple Watch to start using Watch Speaks.")
             }
@@ -103,22 +102,6 @@ struct ContentView: View {
 
     private var testSection: some View {
         Section {
-            Button {
-                sync.sendTestAnnouncement()
-                showSent()
-            } label: {
-                HStack {
-                    Label("Send Test Announcement", systemImage: "speaker.wave.3.fill")
-                    Spacer()
-                    if testSent {
-                        Text("Sent")
-                            .font(.subheadline)
-                            .foregroundStyle(.green)
-                            .transition(.opacity)
-                    }
-                }
-            }
-
             Picker("Fire after", selection: $testDelay) {
                 Text("15 seconds").tag(TimeInterval(15))
                 Text("30 seconds").tag(TimeInterval(30))
@@ -131,7 +114,7 @@ struct ContentView: View {
                 showScheduled()
             } label: {
                 HStack {
-                    Label("Send delayed test", systemImage: "timer")
+                    Label("Send test announcement", systemImage: "speaker.wave.3.fill")
                     Spacer()
                     if testScheduled {
                         Text("Scheduled")
@@ -141,6 +124,7 @@ struct ContentView: View {
                     }
                 }
             }
+
             if let granted = sync.notificationPermission {
                 HStack {
                     Image(systemName: granted ? "bell.badge.fill" : "bell.slash.fill")
@@ -154,7 +138,7 @@ struct ContentView: View {
         } header: {
             Text("Testing")
         } footer: {
-            Text("Delayed test schedules an iPhone notification — lock your iPhone first so it mirrors to your Watch.\n\nCheck: Watch app → My Watch → Notifications → Watch Speaks → ensure Mirror iPhone Alerts is ON.")
+            Text("Schedules a test announcement so you can lock your iPhone first. The notification mirrors to your Watch and speaks aloud.\n\nCheck: Watch app \u{2192} My Watch \u{2192} Notifications \u{2192} Watch Speaks \u{2192} Mirror iPhone Alerts is ON.")
         }
     }
 
@@ -194,14 +178,6 @@ struct ContentView: View {
             }
         } header: {
             Text("Recent Announcements")
-        }
-    }
-
-    private func showSent() {
-        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        withAnimation { testSent = true }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-            withAnimation { testSent = false }
         }
     }
 
