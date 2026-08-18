@@ -217,6 +217,33 @@ class ConnectivityManager: NSObject, ObservableObject, WCSessionDelegate {
         )
     }
 
+    /// Schedule a delayed test notification — gives the user time to lock their
+    /// iPhone so the notification mirrors to Watch for background speech testing.
+    /// Only posts the notification (no WCSession), purely testing the mirroring path.
+    func scheduleDelayedTest(seconds: TimeInterval) {
+        let content = UNMutableNotificationContent()
+        content.title = "Watch Speaks"
+        content.body = "This is a test announcement from Watch Speaks"
+        content.categoryIdentifier = "ANNOUNCEMENT"
+        content.userInfo = ["spokenText": "This is a test announcement from Watch Speaks"]
+        content.sound = .default
+        content.interruptionLevel = .timeSensitive
+
+        let request = UNNotificationRequest(
+            identifier: "delayed-test-\(UUID().uuidString)",
+            content: content,
+            trigger: UNTimeIntervalNotificationTrigger(
+                timeInterval: max(1, seconds), repeats: false
+            )
+        )
+
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error = error {
+                print("[Phone] Delayed test notification error: \(error)")
+            }
+        }
+    }
+
     // MARK: - Receive State from Watch
 
     func session(_ session: WCSession, didReceiveApplicationContext applicationContext: [String: Any]) {

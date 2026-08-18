@@ -4,7 +4,8 @@ struct ContentView: View {
     @ObservedObject private var sync = ConnectivityManager.shared
 
     @State private var showingAbout = false
-    @State private var testSent = false
+    @State private var testDelay: TimeInterval = 60
+    @State private var testScheduled = false
 
     var body: some View {
         NavigationStack {
@@ -101,15 +102,22 @@ struct ContentView: View {
 
     private var testSection: some View {
         Section {
+            Picker("Fire after", selection: $testDelay) {
+                Text("15 seconds").tag(TimeInterval(15))
+                Text("30 seconds").tag(TimeInterval(30))
+                Text("1 minute").tag(TimeInterval(60))
+                Text("2 minutes").tag(TimeInterval(120))
+            }
+
             Button {
-                sync.sendTestAnnouncement()
-                showSent()
+                sync.scheduleDelayedTest(seconds: testDelay)
+                showScheduled()
             } label: {
                 HStack {
-                    Label("Send Test Announcement", systemImage: "speaker.wave.3.fill")
+                    Label("Send test announcement", systemImage: "speaker.wave.3.fill")
                     Spacer()
-                    if testSent {
-                        Text("Sent")
+                    if testScheduled {
+                        Text("Scheduled")
                             .font(.subheadline)
                             .foregroundStyle(.green)
                             .transition(.opacity)
@@ -117,9 +125,9 @@ struct ContentView: View {
                 }
             }
         } header: {
-            Text("Test")
+            Text("Testing")
         } footer: {
-            Text("Sends a test message to your Apple Watch to be spoken aloud.")
+            Text("Schedules a delayed announcement so you can lock your iPhone first. The notification mirrors to your Watch and speaks aloud.")
         }
     }
 
@@ -162,11 +170,11 @@ struct ContentView: View {
         }
     }
 
-    private func showSent() {
+    private func showScheduled() {
         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-        withAnimation { testSent = true }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-            withAnimation { testSent = false }
+        withAnimation { testScheduled = true }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+            withAnimation { testScheduled = false }
         }
     }
 }
