@@ -3,7 +3,7 @@ import WatchConnectivity
 import SwiftUI
 import UserNotifications
 
-class ConnectivityManager: NSObject, ObservableObject, WCSessionDelegate {
+class ConnectivityManager: NSObject, ObservableObject, WCSessionDelegate, UNUserNotificationCenterDelegate {
     static let shared = ConnectivityManager()
 
     // MARK: - Watch State (received)
@@ -13,6 +13,7 @@ class ConnectivityManager: NSObject, ObservableObject, WCSessionDelegate {
     @Published var watchVersion: String?
     @Published var watchBuild: String?
     @Published var lastSpokenText: String?
+    @Published var notificationPermission: Bool?
     @Published var isSpeaking = false
 
     // MARK: - Settings (synced to Watch)
@@ -71,9 +72,18 @@ class ConnectivityManager: NSObject, ObservableObject, WCSessionDelegate {
 
     private func setupNotifications() {
         let center = UNUserNotificationCenter.current()
+
+        // Set ourselves as delegate — SmartBottleTalk does this so notifications
+        // are properly presented even when the app is in the foreground
+        center.delegate = self
+
         center.requestAuthorization(options: [.alert, .sound]) { granted, error in
+            DispatchQueue.main.async {
+                self.notificationPermission = granted
+            }
             print("[Phone] Notification permission: \(granted), error: \(String(describing: error))")
         }
+
         // Register category so watchOS routes mirrored notifications
         // to the Watch's WKNotificationScene / NotificationController
         let category = UNNotificationCategory(
@@ -82,6 +92,25 @@ class ConnectivityManager: NSObject, ObservableObject, WCSessionDelegate {
             intentIdentifiers: [],
             options: [])
         center.setNotificationCategories([category])
+    }
+
+    // MARK: - UNUserNotificationCenterDelegate
+
+    /// Present notifications even when the app is in the foreground (SmartBottleTalk pattern).
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        completionHandler([.banner, .sound, .list])
+    }
+
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse,
+        withCompletionHandler completionHandler: @escaping () -> Void
+    ) {
+        completionHandler()
     }
 
     func start() {

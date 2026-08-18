@@ -141,10 +141,20 @@ struct ContentView: View {
                     }
                 }
             }
+            if let granted = sync.notificationPermission {
+                HStack {
+                    Image(systemName: granted ? "bell.badge.fill" : "bell.slash.fill")
+                        .foregroundStyle(granted ? .green : .red)
+                        .font(.caption)
+                    Text(granted ? "iPhone Notifications Allowed" : "iPhone Notifications DENIED")
+                        .font(.caption)
+                        .foregroundStyle(granted ? .secondary : .red)
+                }
+            }
         } header: {
             Text("Testing")
         } footer: {
-            Text("Send Test delivers immediately via WCSession. Delayed test schedules an iPhone notification — lock your iPhone first so it mirrors to your Watch.")
+            Text("Delayed test schedules an iPhone notification — lock your iPhone first so it mirrors to your Watch.\n\nCheck: Watch app → My Watch → Notifications → Watch Speaks → ensure Mirror iPhone Alerts is ON.")
         }
     }
 
