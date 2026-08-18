@@ -1,18 +1,18 @@
 import Foundation
 import WatchConnectivity
 import WatchKit
-import UserNotifications
 
-/// Minimal Watch connectivity — matches SmartBottleTalk's architecture.
-/// Receives settings from iPhone and handles foreground speech.
+/// Minimal Watch connectivity — matches SmartBottleTalk's architecture exactly.
+/// Receives settings from iPhone and handles foreground speech only.
 /// Background speech is handled entirely by iPhone notification mirroring →
-/// WKNotificationScene → NotificationController (no Watch-side notifications).
+/// WKNotificationScene → NotificationController.
+/// The Watch uses ZERO UNUserNotificationCenter — no permission requests,
+/// no category registration, no local notifications (matching SmartBottleTalk).
 class WatchConnectivityManager: NSObject, ObservableObject, WCSessionDelegate {
     static let shared = WatchConnectivityManager()
 
     @Published var announcementsEnabled = true
     @Published var prefixSourceName = true
-    @Published var notificationsAllowed: Bool?
 
     private var hasStarted = false
     private var processedIds = Set<String>()
@@ -28,32 +28,10 @@ class WatchConnectivityManager: NSObject, ObservableObject, WCSessionDelegate {
     func start() {
         guard !hasStarted else { return }
         hasStarted = true
-        requestNotificationPermission()
         guard WCSession.isSupported() else { return }
         let session = WCSession.default
         session.delegate = self
         session.activate()
-    }
-
-    // MARK: - Notification Permission
-
-    func requestNotificationPermission() {
-        UNUserNotificationCenter.current().requestAuthorization(
-            options: [.alert, .sound]
-        ) { granted, error in
-            DispatchQueue.main.async {
-                self.notificationsAllowed = granted
-            }
-            print("[Watch] Notification permission: \(granted), error: \(String(describing: error))")
-        }
-    }
-
-    func checkNotificationPermission() {
-        UNUserNotificationCenter.current().getNotificationSettings { settings in
-            DispatchQueue.main.async {
-                self.notificationsAllowed = settings.authorizationStatus == .authorized
-            }
-        }
     }
 
     // MARK: - WCSessionDelegate
@@ -177,42 +155,13 @@ class WatchConnectivityManager: NSObject, ObservableObject, WCSessionDelegate {
                     SpeechManager.shared.speak(text, source: source, prefixSource: prefixSource)
                 }
             } else {
-                // Background: store for foreground recovery, then post a local
-                // notification so WKNotificationScene presents the long-look
-                // (NotificationController.didReceive speaks the text).
-                // NO willPresent handler exists, so the notification flows
-                // naturally to WKNotificationScene.
+                // Background: store for foreground recovery.
+                // Background speech relies on iPhone notification mirroring →
+                // WKNotificationScene → NotificationController.
                 self.pendingSpeech = (text: text, source: source, prefixSource: prefixSource)
-                self.postAnnouncementNotification(text: text, source: source)
             }
 
             self.sendState()
-        }
-    }
-
-    // MARK: - Local Notifications (triggers WKNotificationScene)
-
-    private func postAnnouncementNotification(text: String, source: String?) {
-        let content = UNMutableNotificationContent()
-        content.title = source ?? "Watch Speaks"
-        content.body = text
-        content.categoryIdentifier = "ANNOUNCEMENT"
-        content.userInfo = ["spokenText": text]
-        content.sound = .default
-        content.interruptionLevel = .timeSensitive
-
-        let request = UNNotificationRequest(
-            identifier: "announce-\(UUID().uuidString)",
-            content: content,
-            trigger: nil  // immediate
-        )
-
-        UNUserNotificationCenter.current().add(request) { error in
-            if let error = error {
-                print("[Watch] Notification error: \(error)")
-            } else {
-                print("[Watch] Posted announcement notification")
-            }
         }
     }
 }
