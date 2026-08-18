@@ -4,6 +4,7 @@ struct ContentView: View {
     @ObservedObject private var sync = ConnectivityManager.shared
 
     @State private var showingAbout = false
+    @State private var testSent = false
     @State private var testDelay: TimeInterval = 60
     @State private var testScheduled = false
 
@@ -102,6 +103,22 @@ struct ContentView: View {
 
     private var testSection: some View {
         Section {
+            Button {
+                sync.sendTestAnnouncement()
+                showSent()
+            } label: {
+                HStack {
+                    Label("Send Test Announcement", systemImage: "speaker.wave.3.fill")
+                    Spacer()
+                    if testSent {
+                        Text("Sent")
+                            .font(.subheadline)
+                            .foregroundStyle(.green)
+                            .transition(.opacity)
+                    }
+                }
+            }
+
             Picker("Fire after", selection: $testDelay) {
                 Text("15 seconds").tag(TimeInterval(15))
                 Text("30 seconds").tag(TimeInterval(30))
@@ -114,7 +131,7 @@ struct ContentView: View {
                 showScheduled()
             } label: {
                 HStack {
-                    Label("Send test announcement", systemImage: "speaker.wave.3.fill")
+                    Label("Send delayed test", systemImage: "timer")
                     Spacer()
                     if testScheduled {
                         Text("Scheduled")
@@ -127,7 +144,7 @@ struct ContentView: View {
         } header: {
             Text("Testing")
         } footer: {
-            Text("Schedules a delayed announcement so you can lock your iPhone first. The notification mirrors to your Watch and speaks aloud.")
+            Text("Send Test delivers immediately via WCSession. Delayed test schedules an iPhone notification — lock your iPhone first so it mirrors to your Watch.")
         }
     }
 
@@ -167,6 +184,14 @@ struct ContentView: View {
             }
         } header: {
             Text("Recent Announcements")
+        }
+    }
+
+    private func showSent() {
+        UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+        withAnimation { testSent = true }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            withAnimation { testSent = false }
         }
     }
 

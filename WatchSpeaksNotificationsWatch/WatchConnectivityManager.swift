@@ -177,13 +177,42 @@ class WatchConnectivityManager: NSObject, ObservableObject, WCSessionDelegate {
                     SpeechManager.shared.speak(text, source: source, prefixSource: prefixSource)
                 }
             } else {
-                // Background: store for foreground recovery.
-                // Speech is handled by iPhone notification mirroring →
-                // WKNotificationScene → NotificationController.
+                // Background: store for foreground recovery, then post a local
+                // notification so WKNotificationScene presents the long-look
+                // (NotificationController.didReceive speaks the text).
+                // NO willPresent handler exists, so the notification flows
+                // naturally to WKNotificationScene.
                 self.pendingSpeech = (text: text, source: source, prefixSource: prefixSource)
+                self.postAnnouncementNotification(text: text, source: source)
             }
 
             self.sendState()
+        }
+    }
+
+    // MARK: - Local Notifications (triggers WKNotificationScene)
+
+    private func postAnnouncementNotification(text: String, source: String?) {
+        let content = UNMutableNotificationContent()
+        content.title = source ?? "Watch Speaks"
+        content.body = text
+        content.categoryIdentifier = "ANNOUNCEMENT"
+        content.userInfo = ["spokenText": text]
+        content.sound = .default
+        content.interruptionLevel = .timeSensitive
+
+        let request = UNNotificationRequest(
+            identifier: "announce-\(UUID().uuidString)",
+            content: content,
+            trigger: nil  // immediate
+        )
+
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error = error {
+                print("[Watch] Notification error: \(error)")
+            } else {
+                print("[Watch] Posted announcement notification")
+            }
         }
     }
 }
