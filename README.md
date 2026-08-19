@@ -18,9 +18,8 @@ This architecture matches the proven SmartBottleTalk pattern: the iPhone posts a
 - **Shortcuts Action** — "Announce on Watch" action available in the Shortcuts app for building automations
 - **Speech Customization** — Adjust speech rate and pitch to your preference
 - **Source Prefix** — Optionally say the source app name before each announcement (e.g., "Calendar: Meeting in 15 minutes")
-- **Delayed Test** — Schedule a test announcement with a configurable delay so you can lock your iPhone first
+- **Delayed Test** — Schedule a test announcement with a configurable delay so you can lock your iPhone first; shows notification permission status
 - **Announcement Log** — View recent announcements with delivery status and timestamps
-- **Notification Permission Status** — Shows whether iPhone notifications are enabled
 
 ### Apple Watch App
 - **Text-to-Speech** — Speaks announcements through the Watch speaker using AVSpeechSynthesizer
