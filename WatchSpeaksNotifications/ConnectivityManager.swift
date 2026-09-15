@@ -239,6 +239,78 @@ class ConnectivityManager: NSObject, ObservableObject, WCSessionDelegate, UNUser
         }
     }
 
+    /// Async variant used by the Shortcuts intent — waits for the notification
+    /// to be fully queued before returning, preventing process termination
+    /// before the notification is posted.
+    func sendAnnouncementAsync(text: String, source: String) async {
+        guard announcementsEnabled else { return }
+
+        await waitForActivation()
+        guard WCSession.default.activationState == .activated else { return }
+
+        let messageId = UUID().uuidString
+
+        let message: [String: Any] = [
+            "type": "announcement",
+            "id": messageId,
+            "text": text,
+            "source": source,
+            "timestamp": Date().timeIntervalSince1970,
+            "prefixSource": prefixSourceName,
+        ]
+
+        let entry = AnnouncementEntry(
+            id: UUID(),
+            text: text,
+            source: source,
+            timestamp: Date(),
+            delivered: WCSession.default.isReachable
+        )
+
+        await MainActor.run {
+            self.announcementLog.insert(entry, at: 0)
+            if self.announcementLog.count > 50 {
+                self.announcementLog = Array(self.announcementLog.prefix(50))
+            }
+            self.saveLog()
+        }
+
+        // Channel 1: Queue via transferUserInfo for guaranteed delivery
+        WCSession.default.transferUserInfo(message)
+
+        // Channel 2: Try sendMessage for immediate delivery when Watch app is active
+        if WCSession.default.isReachable {
+            WCSession.default.sendMessage(message, replyHandler: nil, errorHandler: nil)
+        }
+
+        // Channel 3: Embed in application context so Watch gets it on ANY wake-up
+        latestAnnouncementForContext = message
+        syncSettings()
+
+        // Channel 4: Post iPhone notification — AWAIT so Shortcuts keeps the
+        // process alive until the notification is confirmed queued
+        let content = UNMutableNotificationContent()
+        content.title = source == "Test" ? "Watch Speaks" : source
+        content.body = text
+        content.categoryIdentifier = "ANNOUNCEMENT"
+        content.userInfo = ["spokenText": text]
+        content.sound = .default
+        content.interruptionLevel = .timeSensitive
+
+        let request = UNNotificationRequest(
+            identifier: "announce-\(UUID().uuidString)",
+            content: content,
+            trigger: nil
+        )
+
+        do {
+            try await UNUserNotificationCenter.current().add(request)
+            print("[Phone] Shortcuts notification posted successfully")
+        } catch {
+            print("[Phone] Shortcuts notification error: \(error)")
+        }
+    }
+
     func sendTestAnnouncement() {
         sendAnnouncement(
             text: "This is a test announcement from Watch Speaks",

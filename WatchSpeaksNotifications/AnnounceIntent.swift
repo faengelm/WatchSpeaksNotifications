@@ -20,12 +20,12 @@ struct AnnounceOnWatchIntent: AppIntent {
     func perform() async throws -> some IntentResult & ProvidesDialog {
         let manager = ConnectivityManager.shared
 
-        // Wait for WCSession to activate (critical when launched from Shortcuts)
-        await manager.waitForActivation()
+        // Use the async variant that AWAITS notification posting.
+        // When Shortcuts launches the app, the process may be terminated
+        // as soon as perform() returns — the async path keeps it alive
+        // until the notification is confirmed queued by the system.
+        await manager.sendAnnouncementAsync(text: text, source: sourceApp)
 
-        await MainActor.run {
-            manager.sendAnnouncement(text: text, source: sourceApp)
-        }
         return .result(dialog: "Announcement sent to Apple Watch")
     }
 }
