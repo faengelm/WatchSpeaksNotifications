@@ -16,6 +16,50 @@ class ConnectivityManager: NSObject, ObservableObject, WCSessionDelegate, UNUser
     @Published var notificationPermission: Bool?
     @Published var isSpeaking = false
 
+    // MARK: - Diagnostics (live WCSession state)
+
+    var diagnostics: [String: String] {
+        let session = WCSession.default
+        var d: [String: String] = [:]
+
+        d["activationState"] = {
+            switch session.activationState {
+            case .notActivated: return "notActivated"
+            case .inactive: return "inactive"
+            case .activated: return "activated"
+            @unknown default: return "unknown(\(session.activationState.rawValue))"
+            }
+        }()
+        d["isPaired"] = "\(session.isPaired)"
+        d["isWatchAppInstalled"] = "\(session.isWatchAppInstalled)"
+        d["isReachable"] = "\(session.isReachable)"
+        d["isCompanionAppInstalled"] = "\(session.isCompanionAppInstalled)"
+        d["watchDirectoryURL"] = session.watchDirectoryURL?.path ?? "(nil)"
+        d["hasContentPending"] = "\(session.hasContentPending)"
+        d["remainingComplicationUserInfoTransfers"] = "\(session.remainingComplicationUserInfoTransfers)"
+        d["outstandingUserInfoTransfers"] = "\(session.outstandingUserInfoTransfers.count)"
+        d["outstandingFileTransfers"] = "\(session.outstandingFileTransfers.count)"
+
+        // App info
+        let bundle = Bundle.main
+        d["iPhone_version"] = bundle.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
+        d["iPhone_build"] = bundle.infoDictionary?["CFBundleVersion"] as? String ?? "?"
+        d["iPhone_bundleID"] = bundle.bundleIdentifier ?? "?"
+        d["iPhone_iOS"] = ProcessInfo.processInfo.operatingSystemVersionString
+
+        // Notification state
+        d["notificationPermission"] = notificationPermission.map { $0 ? "granted" : "denied" } ?? "unknown"
+
+        // Watch state (from last applicationContext)
+        d["watch_version"] = watchVersion ?? "(not received)"
+        d["watch_build"] = watchBuild ?? "(not received)"
+
+        d["announcementsEnabled"] = "\(announcementsEnabled)"
+        d["prefixSourceName"] = "\(prefixSourceName)"
+
+        return d
+    }
+
     // MARK: - Settings (synced to Watch)
 
     @Published var speechRate: Float = 0.5 {

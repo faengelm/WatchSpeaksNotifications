@@ -3,6 +3,7 @@ import SwiftUI
 struct AboutView: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var sync = ConnectivityManager.shared
+    @State private var showingDiagnostics = false
 
     private var appVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "\u{2014}"
@@ -52,6 +53,14 @@ struct AboutView: View {
                 }
 
                 Section {
+                    Button {
+                        showingDiagnostics = true
+                    } label: {
+                        Label("Diagnostics", systemImage: "stethoscope")
+                    }
+                }
+
+                Section {
                     Text("\u{00A9} 2026 Technology4Seniors LLC.\nAll rights reserved.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
@@ -65,6 +74,9 @@ struct AboutView: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") { dismiss() }
                 }
+            }
+            .sheet(isPresented: $showingDiagnostics) {
+                DiagnosticView()
             }
         }
     }
