@@ -25,7 +25,6 @@ struct DiagnosticView: View {
                     diagRow("isPaired")
                     diagRow("isWatchAppInstalled")
                     diagRow("isReachable")
-                    diagRow("isCompanionAppInstalled")
                     diagRow("watchDirectoryURL")
                     diagRow("hasContentPending")
                     diagRow("outstandingUserInfoTransfers")
@@ -95,7 +94,7 @@ struct DiagnosticView: View {
             Spacer()
             Text(value)
                 .font(.system(.caption, design: .monospaced))
-                .foregroundStyle(isGood == nil ? .primary : (isGood! ? .green : .red))
+                .foregroundColor(isGood == nil ? Color.primary : (isGood! ? Color.green : Color.red))
                 .lineLimit(1)
                 .truncationMode(.middle)
         }

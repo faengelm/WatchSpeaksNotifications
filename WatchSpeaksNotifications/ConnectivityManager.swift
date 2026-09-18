@@ -33,7 +33,9 @@ class ConnectivityManager: NSObject, ObservableObject, WCSessionDelegate, UNUser
         d["isPaired"] = "\(session.isPaired)"
         d["isWatchAppInstalled"] = "\(session.isWatchAppInstalled)"
         d["isReachable"] = "\(session.isReachable)"
+        #if os(watchOS)
         d["isCompanionAppInstalled"] = "\(session.isCompanionAppInstalled)"
+        #endif
         d["watchDirectoryURL"] = session.watchDirectoryURL?.path ?? "(nil)"
         d["hasContentPending"] = "\(session.hasContentPending)"
         d["remainingComplicationUserInfoTransfers"] = "\(session.remainingComplicationUserInfoTransfers)"
